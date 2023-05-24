@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+
 import os
 
 file_size = 1024 * 1024  # 1 MB
