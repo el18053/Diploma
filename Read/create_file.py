@@ -2,7 +2,9 @@
 
 import os
 
-file_size = 1024 * 1024  # 1 MB
+
+x = 10
+file_size = 1024 * 1024 * x # x MB
 file_path = 'output.txt'
 
 with open(file_path, 'wb') as file:
