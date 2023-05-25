@@ -3,39 +3,41 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#define BUFFER_SIZE 8096
+#define BUFFER_SIZE 1024*1024
 
 int main(int argc, char **argv) {
-    const char* file_path = argv[1];
-    int file_descriptor;
-    char buffer[BUFFER_SIZE];
+	const char* file_path = argv[1];
+	int file_descriptor;
+	char buffer[BUFFER_SIZE];
 
-    // Open the file
-    file_descriptor = open(file_path, O_RDONLY);
-    if (file_descriptor == -1) {
-        perror("Failed to open the file");
-        exit(1);
-    }
+	// Open the file
+	file_descriptor = open(file_path, O_RDONLY);
+	if (file_descriptor == -1) {
+		perror("Failed to open the file");
+		exit(1);
+	}
 
-    // Read from the file using pread64 in a loop
-    ssize_t offset = 0; // Starting offset
-    ssize_t bytes_read;
+	// Read from the file using pread64 in a loop
+	ssize_t offset = 0; // Starting offset
+	ssize_t bytes_read;
 
-    while ((bytes_read = pread64(file_descriptor, buffer, BUFFER_SIZE, offset)) > 0) {
-        // Print the content read from the file
-        //printf("Read %zd bytes: %.*s\n", bytes_read, (int)bytes_read, buffer);
+	//bytes_read = pread(file_descriptor, buffer, BUFFER_SIZE, offset);
 
-        offset += bytes_read; // Update the offset
-    }
+	while ((bytes_read = pread(file_descriptor, buffer, BUFFER_SIZE, offset)) > 0) {
+	// Print the content read from the file
+	//printf("Read %zd bytes: %.*s\n", bytes_read, (int)bytes_read, buffer);
 
-    if (bytes_read == -1) {
-        perror("Failed to read the file");
-        close(file_descriptor);
-        exit(1);
-    }
+	  offset += bytes_read; // Update the offset
+	}
 
-    // Close the file
-    close(file_descriptor);
+	if (bytes_read == -1) {
+		perror("Failed to read the file");
+		close(file_descriptor);
+		exit(1);
+	}
 
-    return 0;
+	// Close the file
+	close(file_descriptor);
+
+	return 0;
 }
