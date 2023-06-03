@@ -2,11 +2,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include "helloworld.skel.h"
 
-#define BUFFER_SIZE 1024*1024
+#define BUFFER_SIZE 4096
 
 typedef __u64 u64;
 typedef char stringkey[64];
@@ -47,14 +48,23 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to init the process pid, %d\n", err);
 		goto cleanup;
 	}
-	
-	stringkey access_key = "accessed";
+
+	stringkey access_key = "mark_page_accessed";
 	v = 0;
 	err = bpf_map__update_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &v, sizeof(v),  BPF_ANY);
 	if (err != 0) {
 		fprintf(stderr, "Failed to init the process pid, %d\n", err);
 		goto cleanup;
 	}
+
+	stringkey copy_page_key = "copy_page_to_iter";
+	v = 0;
+	err = bpf_map__update_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &v, sizeof(v),  BPF_ANY);
+	if (err != 0) {
+		fprintf(stderr, "Failed to init the process pid, %d\n", err);
+		goto cleanup;
+	}
+
 
 	stringkey access_key_1 = "sync_accessed";
 	v = 0;
@@ -85,84 +95,83 @@ int main(int argc, char **argv)
 	printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
 			"to see output of the BPF programs.\n");
 
-	//for (;;) {
-		/* trigger our BPF program */
-		const char* file_path = "output.txt";
-		int file_descriptor;
-		char buffer[BUFFER_SIZE];
+	/* trigger our BPF program */
+	const char *file_path = "output.txt";
+	int fd;
+	char buffer[BUFFER_SIZE];
+	ssize_t bytes_read, offset = 0;
 
-		// Open the file
-		file_descriptor = open(file_path, O_RDONLY);
-		if (file_descriptor == -1) {
-			fprintf(stderr, "Failed to open the file");
-			err = file_descriptor;
-			goto cleanup;
-		}
+	// Open the file
+	fd = open(file_path, O_RDONLY);
 
-		// Read from the file using pread64 in a loop
-		ssize_t offset = 0; // Starting offset
-		ssize_t bytes_read;
+	if (fd == -1) {
+		perror("Failed to open the file");
+		exit(1);
+	}
 
-		//bytes_read = pread(file_descriptor, buffer, BUFFER_SIZE, offset);
+	//Read the file backwards
+	// Get the size of the file
+    	struct stat st;
+    	fstat(fd, &st);
+    	off_t file_size = st.st_size;
 
-		while ((bytes_read = pread(file_descriptor, buffer, BUFFER_SIZE, offset)) > 0) {
-			// Print the content read from the file
-			//printf("Read %zd bytes\n", bytes_read);
+    	for (offset = file_size - BUFFER_SIZE; offset >= 0; offset -= BUFFER_SIZE) {
+        	bytes_read = pread(fd, buffer, BUFFER_SIZE, offset);
+        	if (bytes_read == -1) {
+            		perror("pread");
+            		exit(EXIT_FAILURE);
+        	}
+	}
 
-			offset += bytes_read; // Update the offset
-		}
+	// Read the file sequentially
+	offset = 0;
+	while ((bytes_read = pread(fd, buffer, BUFFER_SIZE, offset)) > 0) {
+		offset += bytes_read;
+	}
 
-		if (bytes_read == -1) {
-			fprintf(stderr, "Failed to read the file");
-			close(file_descriptor);
-			err = bytes_read;
-			goto cleanup;
-		}
+	// Close the file
+	close(fd);
 
-		// Close the file
-		close(file_descriptor);
+	u64 accesses, copy_page, sync_accesses, async_accesses;
 
-		u64 accesses, sync_accesses, async_accesses;
-		
-		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &accesses, sizeof(accesses), BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Lookup key from map error: %d\n", err);
-			goto cleanup;
-		}
-		else {
-			printf("Number page accesses : %lld\n", accesses);
-		}
+	err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &accesses, sizeof(accesses), BPF_ANY);
+	if (err != 0) {
+		fprintf(stderr, "Lookup key from map error: %d\n", err);
+		goto cleanup;
+	}
+	else {
+		printf("Number page accesses : %lld\n", accesses);
+	}
 
-		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &sync_accesses, sizeof(sync_accesses), BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Lookup key from map error: %d\n", err);
-			goto cleanup;
-		}
-		else {
-			printf("Number page cache misses : %lld\n", sync_accesses);
-		}
-
-		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &async_accesses, sizeof(async_accesses), BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Lookup key from map error: %d\n", err);
-			goto cleanup;
-		}
-		else {
-			printf("Number of prefetched pages : %lld\n", async_accesses);
-		}
-
-		if (sync_accesses > 0 || async_accesses > 0) 
-		{
-			if ( accesses != sync_accesses + async_accesses )
-			{
-				fprintf(stderr, "Error in page cache accesses!!!\n");
-				goto cleanup;
-			}
-		}
+	err = bpf_map__lookup_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &copy_page, sizeof(copy_page), BPF_ANY);
+	if (err != 0) {
+		fprintf(stderr, "Lookup key from map error: %d\n", err);
+		goto cleanup;
+	}
+	else {
+		printf("Number page copied to user : %lld\n", copy_page);
+	}
 
 
-		sleep(1);
-	//}
+	err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &sync_accesses, sizeof(sync_accesses), BPF_ANY);
+	if (err != 0) {
+		fprintf(stderr, "Lookup key from map error: %d\n", err);
+		goto cleanup;
+	}
+	else {
+		printf("Number page cache misses : %lld\n", sync_accesses);
+	}
+
+	err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &async_accesses, sizeof(async_accesses), BPF_ANY);
+	if (err != 0) {
+		fprintf(stderr, "Lookup key from map error: %d\n", err);
+		goto cleanup;
+	}
+	else {
+		printf("Number of prefetched pages : %lld\n", async_accesses);
+	}
+
+	sleep(1);
 
 cleanup:
 	helloworld_bpf__destroy(skel);
