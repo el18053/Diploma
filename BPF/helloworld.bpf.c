@@ -306,8 +306,8 @@ int trace_copy_page_to_iter(struct pt_regs *ctx)
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			//bpf_printk("copy_page_to_iter started\n");
-			stringkey new_key = "accessed";
+			bpf_printk("copy_page_to_iter started\n");
+			stringkey new_key = "copy_page_to_iter";
 			v = NULL;
 			v = bpf_map_lookup_elem(&execve_counter, &new_key);
 			if (v != NULL) {
@@ -321,7 +321,7 @@ int trace_copy_page_to_iter(struct pt_regs *ctx)
 
 }
 
-/*SEC("kprobe/mark_page_accessed")
+SEC("kprobe/mark_page_accessed")
 
 int trace__(struct pt_regs *ctx)
 {
@@ -332,18 +332,18 @@ int trace__(struct pt_regs *ctx)
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			stringkey new_key = "accessed";
+			bpf_printk("mark_page_accessed started\n");
+			stringkey new_key = "mark_page_accessed";
 			v = NULL;
 			v = bpf_map_lookup_elem(&execve_counter, &new_key);
 			if (v != NULL) {
 				*v += 1;
-				// *v += PT_REGS_RC(ctx);
 			}
 		}
 	}
 
 	return 0;
 
-}*/
+}
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
