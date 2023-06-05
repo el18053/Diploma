@@ -184,27 +184,17 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Lookup key from map error: %d\n", err);
 			goto cleanup;
 		}
-		else {
-			printf("Number page accesses : %lld\n", accesses);
-		}
 
 		err = bpf_map__lookup_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &copy_page, sizeof(copy_page), BPF_ANY);
 		if (err != 0) {
 			fprintf(stderr, "Lookup key from map error: %d\n", err);
 			goto cleanup;
 		}
-		else {
-			printf("Number page copied to user : %lld\n", copy_page);
-		}
-
 
 		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &sync_accesses, sizeof(sync_accesses), BPF_ANY);
 		if (err != 0) {
 			fprintf(stderr, "Lookup key from map error: %d\n", err);
 			goto cleanup;
-		}
-		else {
-			printf("Number page cache misses : %lld\n", sync_accesses);
 		}
 
 		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &async_accesses, sizeof(async_accesses), BPF_ANY);
@@ -212,9 +202,16 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Lookup key from map error: %d\n", err);
 			goto cleanup;
 		}
-		else {
-			printf("Number of prefetched pages : %lld\n", async_accesses);
-		}
+
+		printf("Number page accesses : %lld\n", accesses);
+		printf("Number page copied to user : %lld\n", copy_page);
+		printf("Number page cache misses : %lld\n", sync_accesses);
+		printf("Number of prefetched pages : %lld\n", async_accesses);
+		/*double ratio = 0;
+		ratio = (copy_page - sync_accesses) / copy_page;
+		printf("Cache Hit Ratio(%) : %f\n", ratio);
+		ratio = 100 - ratio;
+		printf("Cache Miss Ratio(%) : %f\n", ratio);*/
 	}
 
 	sleep(1);
