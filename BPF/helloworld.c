@@ -11,6 +11,7 @@
 #define BUFFER_SIZE 4096
 
 typedef __u64 u64;
+typedef __u32 u32;
 typedef char stringkey[64];
 
 
@@ -42,16 +43,8 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	/*stringkey pid_key = "pid";
-	  u64 v = getpid();
-	  err = bpf_map__update_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key), &v, sizeof(v),  BPF_ANY);
-	  if (err != 0) {
-	  fprintf(stderr, "Failed to init the process pid, %d\n", err);
-	  goto cleanup;
-	  }*/
-
 	stringkey access_key = "mark_page_accessed";
-	u64 v = 0;
+	u32 v = 0;
 	err = bpf_map__update_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &v, sizeof(v),  BPF_ANY);
 	if (err != 0) {
 		fprintf(stderr, "Failed to init the process pid, %d\n", err);
@@ -153,8 +146,8 @@ int main(int argc, char **argv)
 		int result = system(fioCommand);
 
 		if (result == -1) {
-		printf("Failed to execute FIO command.\n");
-		goto cleanup;
+			printf("Failed to execute FIO command.\n");
+			goto cleanup;
 		}
 	}
 	else {
@@ -162,14 +155,6 @@ int main(int argc, char **argv)
 		printf("Parent process\n");
         	printf("Child PID: %d\n", pid);
 		
-		/*stringkey pid_key = "pid";
-		u64 v = pid;
-		err = bpf_map__update_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key), &v, sizeof(v),  BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Failed to init the process pid, %d\n", err);
-			goto cleanup;
-		}*/
-
 		//wait for child process to execute read commmand
 		int status;
         	wait(&status);
@@ -177,7 +162,7 @@ int main(int argc, char **argv)
             		printf("Child process exited with status: %d\n", WEXITSTATUS(status));
         	}
 
-		u64 accesses, copy_page, sync_accesses, async_accesses;
+		u32 accesses, copy_page, sync_accesses, async_accesses;
 
 		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &accesses, sizeof(accesses), BPF_ANY);
 		if (err != 0) {
@@ -203,15 +188,15 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
-		printf("Number page accesses : %lld\n", accesses);
-		printf("Number page copied to user : %lld\n", copy_page);
-		printf("Number page cache misses : %lld\n", sync_accesses);
-		printf("Number of prefetched pages : %lld\n", async_accesses);
-		/*double ratio = 0;
-		ratio = (copy_page - sync_accesses) / copy_page;
+		printf("Number page accesses : %d\n", accesses);
+		printf("Number page copied to user : %d\n", copy_page);
+		printf("Number page cache misses : %d\n", sync_accesses);
+		printf("Number of prefetched pages : %d\n", async_accesses);
+		double ratio = 0;
+		ratio = ((double)copy_page - sync_accesses) / copy_page;
 		printf("Cache Hit Ratio(%) : %f\n", ratio);
 		ratio = 100 - ratio;
-		printf("Cache Miss Ratio(%) : %f\n", ratio);*/
+		printf("Cache Miss Ratio(%) : %f\n", ratio);
 	}
 
 	sleep(1);
