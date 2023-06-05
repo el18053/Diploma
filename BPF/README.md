@@ -4,6 +4,7 @@ Observations so far :
 
 Questions : 
   1. I am not sure about copy_to_page_iter because :
-    1. Do i count a page access when copy_to_page_iter returns 0
-    2. If i don't count it when it returns 0 then copy_to_page_iter = sync_ra + async_ra
-    3. if i count it then copy_to_page_iter depends on block size
+  
+      1. Do i count a page access when copy_to_page_iter returns 0
+      2. If i don't count it when it returns 0 then copy_to_page_iter = sync_ra + async_ra
+      3. if i count it then copy_to_page_iter depends on block size
