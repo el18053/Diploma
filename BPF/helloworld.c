@@ -194,9 +194,11 @@ int main(int argc, char **argv)
 		printf("Number of prefetched pages : %d\n", async_accesses);
 		double ratio = 0;
 		ratio = ((double)copy_page - sync_accesses) / copy_page;
-		printf("Cache Hit Ratio(%) : %f\n", ratio);
-		ratio = 100 - ratio;
-		printf("Cache Miss Ratio(%) : %f\n", ratio);
+		printf("Cache Hit Ratio(%) : %f\n", ratio*100);
+		ratio = 1 - ratio;
+		printf("Cache Miss Ratio(%) : %f\n", ratio*100);
+		ratio = (double)async_accesses / (double)(async_accesses + sync_accesses);
+		printf("Cache Prefetching Ratio(%) : %f\n", ratio*100);
 	}
 
 	sleep(1);
