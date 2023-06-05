@@ -45,11 +45,11 @@ int trace_pread64(void *ctx) {
 
 	u32 *v;
 	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
-	//if (v == NULL) {
+	if (v == NULL) {
 		bpf_printk("ksys_pread64 started from process with pid:%d\n", uid);
 		v = &uid;
 		bpf_map_update_elem(&execve_counter, &pid_key, v, BPF_ANY);
-	//}
+	}
 	
 	return 0;
 
