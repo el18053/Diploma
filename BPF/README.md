@@ -1,6 +1,16 @@
 Observations so far :
   1. In a seq read i have noticed that mark_page_access = sync_ra + async_ra + 1
   2. In a rand read i have noticed that mark_page_access > sync_ra and almost every time async_ra = 0
+  3. We see in the linux kernel in the function filemap_read the following :
+    "/*
+		 * When a sequential read accesses a page several times, only
+		 * mark it as accessed the first time.
+		 */
+		if (iocb->ki_pos >> PAGE_SHIFT !=
+		    ra->prev_pos >> PAGE_SHIFT)
+			mark_page_accessed(pvec.pages[0]);"
+      If we comment out ONLY the if() (not the mark_page_accessed) then we see that mark_page_access = copy_to_page_iter  
+  4. 
 
 Questions : 
   1. I am not sure about copy_to_page_iter because :
