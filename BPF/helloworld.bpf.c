@@ -273,7 +273,7 @@ int trace_do_page_cache_ra(void *ctx) {
 
 SEC("kprobe/page_cache_ra_unbounded")
 
-int trace_page_cache_ra_unbounded(void *ctx) {
+int trace_page_cache_ra_unbounded(struct pt_regs *ctx) {
 	stringkey pid_key = "pid";
 	u32 *v;
 	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
@@ -281,14 +281,30 @@ int trace_page_cache_ra_unbounded(void *ctx) {
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("page_cache_ra_unbounded started\n");
+			u32 nr_to_read = PT_REGS_PARM2(ctx);
+			bpf_printk("page_cache_ra_unbounded started with nr_to_read=%d\n", nr_to_read);
 		}
 	}
 	return 0;
 
 }
 
+SEC("kprobe/__page_cache_alloc")
 
+int trace_page_cache_alloc(void *ctx) {
+	stringkey pid_key = "pid";
+	u32 *v;
+	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
+	if (v != NULL) {
+		u32 uid;
+		uid = bpf_get_current_pid_tgid();
+		if (*v == uid) {
+			bpf_printk("page_cache_alloc started\n");
+		}
+	}
+	return 0;
+
+}
 
 SEC("kprobe/add_to_page_cache_lru")
 
