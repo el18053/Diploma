@@ -59,7 +59,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-
 	stringkey access_key_1 = "sync_accessed";
 	v = 0;
 	err = bpf_map__update_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &v, sizeof(v),  BPF_ANY);
@@ -75,9 +74,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to init the process pid, %d\n", err);
 		goto cleanup;
 	}
-
-
-
 
 	/* Attach tracepoint handler */
 	err = helloworld_bpf__attach(skel);
@@ -97,12 +93,14 @@ int main(int argc, char **argv)
 	}
 
 	else if (pid == 0) {
+		sleep(1);
+
 		//child process
 		printf("Child process\n");
 
 		/* trigger our BPF program */
 		
-		/*const char *file_path = "output.txt";
+		const char *file_path = "output.txt";
 		int fd;
 		char buffer[BUFFER_SIZE];
 		ssize_t bytes_read, offset = 0;
@@ -117,7 +115,7 @@ int main(int argc, char **argv)
 
 		//Read the file backwards
 		// Get the size of the file
-		struct stat st;
+		/*struct stat st;
 		fstat(fd, &st);
 		off_t file_size = st.st_size;
 
@@ -127,7 +125,7 @@ int main(int argc, char **argv)
 				perror("pread");
 				exit(EXIT_FAILURE);
 			}
-		}
+		}*/
 
 		// Read the file sequentially
 		offset = 0;
@@ -137,16 +135,23 @@ int main(int argc, char **argv)
 
 		// Close the file
 		close(fd);
-		*/
 		
 		// Define the FIO command as a string
-		const char* fioCommand = "fio test.fio";
+		/*const char* fioCommand = "fio test.fio";
 
 		// Execute the FIO command
 		int result = system(fioCommand);
 
 		if (result == -1) {
 			printf("Failed to execute FIO command.\n");
+			goto cleanup;
+		}*/
+
+		//After Read is completed delete the pid of the process. (You don't want to counter accesses anymore !)
+		stringkey pid_key = "pid";
+		err = bpf_map__delete_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key),  BPF_ANY);
+		if (err != 0) {
+			fprintf(stderr, "Failed to delete the (key,pid) of the process with pid, %d\n", err);
 			goto cleanup;
 		}
 	}
@@ -155,6 +160,15 @@ int main(int argc, char **argv)
 		printf("Parent process\n");
         	printf("Child PID: %d\n", pid);
 		
+		//Pid of the process that will execute the read sys call
+		stringkey pid_key = "pid";
+		u32 v = pid;
+		err = bpf_map__update_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key), &v, sizeof(v),  BPF_ANY);
+		if (err != 0) {
+			fprintf(stderr, "Failed to init the process pid, %d\n", err);
+			goto cleanup;
+		}
+			
 		//wait for child process to execute read commmand
 		int status;
         	wait(&status);
@@ -197,7 +211,7 @@ int main(int argc, char **argv)
 		printf("Cache Hit Ratio(%) : %f\n", ratio*100);
 		ratio = 1 - ratio;
 		printf("Cache Miss Ratio(%) : %f\n", ratio*100);
-		ratio = (double)async_accesses / (double)(async_accesses + sync_accesses);
+		ratio = (async_accesses + sync_accesses) > 0 ? (double)async_accesses / (double)(async_accesses + sync_accesses) : 0;
 		printf("Cache Prefetching Ratio(%) : %f\n", ratio*100);
 	}
 
