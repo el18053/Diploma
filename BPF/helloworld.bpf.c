@@ -29,7 +29,7 @@ int trace_pread64(void *ctx) {
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("ksys_pread64 started from process with pid:%d\n",  uid);
+			bpf_printk("ksys_pread64 started from process with pid:%d",  uid);
 		}
 	}
 	return 0;
@@ -46,7 +46,7 @@ int trace_pread64(void *ctx) {
 	u32 *v;
 	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
 	if (v == NULL) {
-		bpf_printk("ksys_pread64 started from process with pid:%d\n", uid);
+		bpf_printk("ksys_pread64 started from process with pid:%d", uid);
 		v = &uid;
 		bpf_map_update_elem(&execve_counter, &pid_key, v, BPF_ANY);
 		//char buf[256], comm[16];
@@ -94,7 +94,7 @@ int trace_filemap_read(void *ctx) {
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("filemap_read started\n");
+			bpf_printk("filemap_read started");
 		}
 	}
 	return 0;
@@ -111,7 +111,7 @@ int trace_filemap_get_pages(void *ctx) {
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("filemap_get_pages started\n");
+			bpf_printk("filemap_get_pages started");
 		}
 	}
 	return 0;
@@ -128,7 +128,7 @@ int trace_filemap_get_read_batch(void *ctx) {
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("filemap_get_read_batch started\n");
+			bpf_printk("filemap_get_read_batch started");
 		}
 	}
 	return 0;
@@ -150,7 +150,7 @@ int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
 			//page_cache_sync_ra started!
 			int req_count = 0;
 			req_count = PT_REGS_PARM2(ctx);
-			bpf_printk("page_cache_sync_ra started with req_count=%d\n", req_count);
+			bpf_printk("page_cache_sync_ra started with req_count=%d", req_count);
 			stringkey sync_ra_key = "sync_ra";
 			u32 myValue = 1;
 			v = &myValue;
@@ -173,7 +173,7 @@ int trace_page_cache_sync_ra_exit(struct pt_regs *ctx)
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
 			//page_cache_sync_ra exits!
-			bpf_printk("page_cache_sync_ra finished\n");
+			bpf_printk("page_cache_sync_ra finished");
 			stringkey sync_ra_key = "sync_ra";
 			v = NULL;
 			v = bpf_map_lookup_elem(&execve_counter, &sync_ra_key);
@@ -199,7 +199,7 @@ int trace_page_cache_async_ra_enter(struct pt_regs *ctx)
 			//page_cache_async_ra started!
 			int req_count = 0;
 			req_count = PT_REGS_PARM3(ctx);
-			bpf_printk("page_cache_async_ra started with req_count=%d\n", req_count);
+			bpf_printk("page_cache_async_ra started with req_count=%d", req_count);
 			stringkey async_ra_key = "async_ra";
 			u32 myValue = 1;
 			v = &myValue;
@@ -222,7 +222,7 @@ int trace_page_cache_async_ra_exit(struct pt_regs *ctx)
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
 			//page_cache_async_ra exits!
-			bpf_printk("page_cache_async_ra finished\n");
+			bpf_printk("page_cache_async_ra finished");
 			stringkey async_ra_key = "async_ra";
 			v = NULL;
 			v = bpf_map_lookup_elem(&execve_counter, &async_ra_key);
@@ -232,6 +232,25 @@ int trace_page_cache_async_ra_exit(struct pt_regs *ctx)
 		}
 	}
 	return 0;
+}
+
+SEC("kprobe/force_page_cache_ra")
+
+int trace_force_page_cache_ra(struct pt_regs *ctx) {
+	stringkey pid_key = "pid";
+	u32 *v;
+	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
+	if (v != NULL) {
+		u32 uid;
+		uid = bpf_get_current_pid_tgid();
+		if (*v == uid) {
+			int req_count = 0;
+			req_count = PT_REGS_PARM2(ctx);
+			bpf_printk("force_page_cache_ra started with req_count=%d", req_count);
+		}
+	}
+	return 0;
+
 }
 
 SEC("kprobe/ondemand_readahead")
@@ -246,7 +265,7 @@ int trace_ondemand_readahead_enter(struct pt_regs *ctx) {
 		if (*v == uid) {
 			int req_size = 0;
 			req_size = PT_REGS_PARM3(ctx);
-			bpf_printk("ondemand_readahead started with req_size=%d\n", req_size);
+			bpf_printk("ondemand_readahead started with req_size=%d", req_size);
 		}
 	}
 	return 0;
@@ -265,43 +284,7 @@ int trace_page_cache_next_miss_exit(struct pt_regs *ctx) {
 		if (*v == uid) {
 			int ret = 0;
 			ret = PT_REGS_RC(ctx);
-			bpf_printk("page_cache_next_miss exited with ret=%d\n", ret);
-		}
-	}
-	return 0;
-
-}
-
-SEC("kprobe/force_page_cache_ra")
-
-int trace_force_page_cache_ra(struct pt_regs *ctx) {
-	stringkey pid_key = "pid";
-	u32 *v;
-	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
-	if (v != NULL) {
-		u32 uid;
-		uid = bpf_get_current_pid_tgid();
-		if (*v == uid) {
-			int req_count = 0;
-			req_count = PT_REGS_PARM2(ctx);
-			bpf_printk("force_page_cache_ra started with req_count=%d\n", req_count);
-		}
-	}
-	return 0;
-
-}
-
-SEC("kprobe/read_pages")
-
-int trace_read_pages(struct pt_regs *ctx) {
-	stringkey pid_key = "pid";
-	u32 *v;
-	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
-	if (v != NULL) {
-		u32 uid;
-		uid = bpf_get_current_pid_tgid();
-		if (*v == uid) {
-			bpf_printk("read_pages started\n");
+			bpf_printk("page_cache_next_miss exited with ret=%d", ret);
 		}
 	}
 	return 0;
@@ -310,7 +293,7 @@ int trace_read_pages(struct pt_regs *ctx) {
 
 SEC("kprobe/do_page_cache_ra")
 
-int trace_do_page_cache_ra(void *ctx) {
+int trace_do_page_cache_ra(struct pt_regs *ctx) {
 	stringkey pid_key = "pid";
 	u32 *v;
 	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
@@ -318,7 +301,8 @@ int trace_do_page_cache_ra(void *ctx) {
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("do_page_cache_ra started\n");
+			u32 req_size = PT_REGS_PARM2(ctx);
+			bpf_printk("do_page_cache_ra started with req_size=%d", req_size);
 		}
 	}
 	return 0;
@@ -336,11 +320,28 @@ int trace_page_cache_ra_unbounded(struct pt_regs *ctx) {
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
 			u32 nr_to_read = PT_REGS_PARM2(ctx);
-			bpf_printk("page_cache_ra_unbounded started with nr_to_read=%d\n", nr_to_read);
+			u32 lookahead_size = PT_REGS_PARM3(ctx);
+			bpf_printk("page_cache_ra_unbounded started with nr_to_read=%d and lookahead_size=%d", nr_to_read, lookahead_size);
 		}
 	}
 	return 0;
 
+}
+
+SEC("kprobe/read_pages")
+
+int trace_read_pages(struct pt_regs *ctx) {
+	stringkey pid_key = "pid";
+	u32 *v;
+	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
+	if (v != NULL) {
+		u32 uid;
+		uid = bpf_get_current_pid_tgid();
+		if (*v == uid) {
+			bpf_printk("read_pages started");
+		}
+	}
+	return 0;
 }
 
 SEC("kprobe/__page_cache_alloc")
@@ -353,7 +354,7 @@ int trace_page_cache_alloc(void *ctx) {
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("page_cache_alloc started\n");
+			bpf_printk("page_cache_alloc started");
 		}
 	}
 	return 0;
@@ -371,7 +372,7 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("add_to_page_cache_lru started\n");
+			bpf_printk("add_to_page_cache_lru started");
 
 			stringkey sync_ra_key = "sync_ra";
 			v = NULL;
@@ -416,7 +417,7 @@ int trace_copy_page_to_iter(struct pt_regs *ctx)
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("copy_page_to_iter started\n");
+			bpf_printk("copy_page_to_iter started");
 			stringkey new_key = "copy_page_to_iter";
 			v = NULL;
 			v = bpf_map_lookup_elem(&execve_counter, &new_key);
@@ -442,7 +443,7 @@ int trace_mark_page_accessed(struct pt_regs *ctx)
 		u32 uid;
 		uid = bpf_get_current_pid_tgid();
 		if (*v == uid) {
-			bpf_printk("mark_page_accessed started\n");
+			bpf_printk("mark_page_accessed started");
 			stringkey new_key = "mark_page_accessed";
 			v = NULL;
 			v = bpf_map_lookup_elem(&execve_counter, &new_key);
