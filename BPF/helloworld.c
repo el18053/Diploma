@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 		sleep(1);
 
 		//child process
-		printf("Child process\n");
+		printf("Child process started\n");
 
 		/* trigger our BPF program */
 		
