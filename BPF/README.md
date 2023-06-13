@@ -10,7 +10,7 @@ Observations so far :
 		    ra->prev_pos >> PAGE_SHIFT)
 			mark_page_accessed(pvec.pages[0]);"
       If we comment out ONLY the if() (not the mark_page_accessed) then we see that mark_page_access = copy_to_page_iter  
-  4. 
+  4. I think that force_page_cache_ra is executed if we use fadvise to notify the kernel that he should go ahead and start the readahead process. Otherwise i think that ondemand_readahead will take care of the readahead.
 
 Questions : 
   1. I am not sure about copy_to_page_iter because :
