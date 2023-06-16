@@ -320,7 +320,7 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 		v = NULL;
 		v = bpf_map_lookup_elem(&execve_counter, &sync_ra_key);
 		if (v != NULL && *v == 1) {
-			stringkey new_key = "async_ra";
+			stringkey new_key = "async_accessed";
 			v = NULL;
 			v = bpf_map_lookup_elem(&execve_counter, &new_key);
 			if (v != NULL) {
