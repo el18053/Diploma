@@ -165,6 +165,13 @@ int trace_page_cache_sync_ra_exit(struct pt_regs *ctx)
 		if (v != NULL) {
 			*v = 0;
 		}
+
+		stringkey first_sync_ra_key = "first_sync_ra";
+		v = NULL;
+		v = bpf_map_lookup_elem(&execve_counter, &first_sync_ra_key);
+		if (v != NULL) {
+			*v = 0;
+		}
 	}
 
 	return 0;
