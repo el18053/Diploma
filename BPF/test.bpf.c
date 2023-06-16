@@ -139,7 +139,7 @@ int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
 		req_count = PT_REGS_PARM2(ctx);
 		bpf_printk("page_cache_sync_ra started with req_count=%d", req_count);
     
-    stringkey first_sync_ra_key = "first_sync_ra";
+    		stringkey first_sync_ra_key = "first_sync_ra";
 		u32 flag = 1;
 		u32 *v = &flag;
 		bpf_map_update_elem(&execve_counter, &first_sync_ra_key, v, BPF_ANY);
@@ -303,11 +303,11 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 	{
 		bpf_printk("add_to_page_cache_lru started");
     
-    stringkey first_sync_ra_key = "first_sync_ra";
+    		stringkey first_sync_ra_key = "first_sync_ra";
 		u32 *v = NULL;
 		v = bpf_map_lookup_elem(&execve_counter, &first_sync_ra_key);
 		if (v != NULL && *v == 1) {
-      *v = 0;
+      			*v = 0;
 			stringkey new_key = "sync_accessed";
 			v = NULL;
 			v = bpf_map_lookup_elem(&execve_counter, &new_key);
