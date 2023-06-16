@@ -314,7 +314,7 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 			if (v != NULL) {
 				*v += 1;
 			}
-    }
+    		}
 
 		stringkey sync_ra_key = "sync_ra";
 		v = NULL;
