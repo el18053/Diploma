@@ -17,207 +17,222 @@ typedef char stringkey[64];
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
-	return vfprintf(stderr, format, args);
+        return vfprintf(stderr, format, args);
 }
 
 int main(int argc, char **argv)
 {
-	struct helloworld_bpf *skel;
-	int err;
+        struct helloworld_bpf *skel;
+        int err;
 
-	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
-	/* Set up libbpf errors and debug info callback */
-	libbpf_set_print(libbpf_print_fn);
+        libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+        /* Set up libbpf errors and debug info callback */
+        libbpf_set_print(libbpf_print_fn);
 
-	/* Open BPF application */
-	skel = helloworld_bpf__open();
-	if (!skel) {
-		fprintf(stderr, "Failed to open BPF skeleton\n");
-		return 1;
-	}   
+        /* Open BPF application */
+        skel = helloworld_bpf__open();
+        if (!skel) {
+                fprintf(stderr, "Failed to open BPF skeleton\n");
+                return 1;
+        }
 
-	/* Load & verify BPF programs */
-	err = helloworld_bpf__load(skel);
-	if (err) {
-		fprintf(stderr, "Failed to load and verify BPF skeleton\n");
-		goto cleanup;
-	}
+        /* Load & verify BPF programs */
+        err = helloworld_bpf__load(skel);
+        if (err) {
+                fprintf(stderr, "Failed to load and verify BPF skeleton\n");
+                goto cleanup;
+        }
 
-	stringkey access_key = "mark_page_accessed";
-	u32 v = 0;
-	err = bpf_map__update_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &v, sizeof(v),  BPF_ANY);
-	if (err != 0) {
-		fprintf(stderr, "Failed to init the process pid, %d\n", err);
-		goto cleanup;
-	}
+        /* Attach tracepoint handler */
+        err = helloworld_bpf__attach(skel);
+        if (err) {
+                fprintf(stderr, "Failed to attach BPF skeleton\n");
+                goto cleanup;
+        }
 
-	stringkey copy_page_key = "copy_page_to_iter";
-	v = 0;
-	err = bpf_map__update_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &v, sizeof(v),  BPF_ANY);
-	if (err != 0) {
-		fprintf(stderr, "Failed to init the process pid, %d\n", err);
-		goto cleanup;
-	}
+        printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
+                        "to see output of the BPF programs.\n");
 
-	stringkey access_key_1 = "sync_accessed";
-	v = 0;
-	err = bpf_map__update_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &v, sizeof(v),  BPF_ANY);
-	if (err != 0) {
-		fprintf(stderr, "Failed to init the process pid, %d\n", err);
-		goto cleanup;
-	}
+        pid_t pid = fork();
 
-	stringkey access_key_2 = "async_accessed";
-	v = 0;
-	err = bpf_map__update_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &v, sizeof(v),  BPF_ANY);
-	if (err != 0) {
-		fprintf(stderr, "Failed to init the process pid, %d\n", err);
-		goto cleanup;
-	}
+        if (pid == -1) {
+                perror("Failed to fork process");
+                goto cleanup;
+        }
 
-	/* Attach tracepoint handler */
-	err = helloworld_bpf__attach(skel);
-	if (err) {
-		fprintf(stderr, "Failed to attach BPF skeleton\n");
-		goto cleanup;
-	}
+        else if (pid == 0) {
+                sleep(1);
 
-	printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
-			"to see output of the BPF programs.\n");
+                //child process
+                printf("Child process started\n");
 
-	pid_t pid = fork();
+                //Init Counters to Zero
+                stringkey access_key = "mark_page_accessed";
+                stringkey copy_page_key = "copy_page_to_iter";
+                stringkey access_key_1 = "sync_accessed";
+                stringkey access_key_2 = "async_accessed";
+                u32 v;
 
-	if (pid == -1) {
-		perror("Failed to fork process");
-		goto cleanup;
-	}
+                for(int i=1; i<=1024; i*=2)
+                {
+                        v = 0;
+                        err = bpf_map__update_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &v, sizeof(v),  BPF_ANY);
+                        if (err != 0) {
+                                fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                                goto cleanup;
+                        }
 
-	else if (pid == 0) {
-		sleep(1);
+                        v = 0;
+                        err = bpf_map__update_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &v, sizeof(v),  BPF_ANY);
+                        if (err != 0) {
+                                fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                                goto cleanup;
+                        }
 
-		//child process
-		printf("Child process started\n");
+                        v = 0;
+                        err = bpf_map__update_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &v, sizeof(v),  BPF_ANY);
+                        if (err != 0) {
+                                fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                                goto cleanup;
+                        }
 
-		/* trigger our BPF program */
-		
-		const char *file_path = "output.txt";
-		int fd;
-		char buffer[BUFFER_SIZE];
-		ssize_t bytes_read, offset = 0;
+                        v = 0;
+                        err = bpf_map__update_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &v, sizeof(v),  BPF_ANY);
+                        if (err != 0) {
+                                fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                                goto cleanup;
+                        }
 
-		// Open the file
-		fd = open(file_path, O_RDONLY);
+                        // Create file to read
+                        char command[100];
+                        sprintf(command, "python3 create_file.py %d", i);
 
-		if (fd == -1) {
-			perror("Failed to open the file");
-			exit(1);
-		}
+                        int result = system(command);
 
-		//Read the file backwards
-		// Get the size of the file
-		/*struct stat st;
-		fstat(fd, &st);
-		off_t file_size = st.st_size;
+                        if (result == -1) {
+                                printf("Failed to create file.\n");
+                                goto cleanup;
+                        }
 
-		for (offset = file_size - BUFFER_SIZE; offset >= 0; offset -= BUFFER_SIZE) {
-			bytes_read = pread(fd, buffer, BUFFER_SIZE, offset);
-			if (bytes_read == -1) {
-				perror("pread");
-				exit(EXIT_FAILURE);
-			}
-		}*/
+                        //Empty Cache
+                        result = system("echo 1 > /proc/sys/vm/drop_caches");
 
-		// Read the file sequentially
-		offset = 0;
-		while ((bytes_read = pread(fd, buffer, BUFFER_SIZE, offset)) > 0) {
-			offset += bytes_read;
-		}
+                        if (result == -1) {
+                                printf("Failed to empty cache.\n");
+                                goto cleanup;
+                        }
 
-		// Close the file
-		close(fd);
-		
-		// Define the FIO command as a string
-		/*const char* fioCommand = "fio test.fio";
+                        /* trigger our BPF program */
 
-		// Execute the FIO command
-		int result = system(fioCommand);
+                        const char *file_path = "output.txt";
+                        int fd;
+                        char buffer[BUFFER_SIZE];
+                        ssize_t bytes_read, offset = 0;
 
-		if (result == -1) {
-			printf("Failed to execute FIO command.\n");
-			goto cleanup;
-		}*/
+                        // Open the file
+                        fd = open(file_path, O_RDONLY);
 
-		//After Read is completed delete the pid of the process. (You don't want to counter accesses anymore !)
-		stringkey pid_key = "pid";
-		err = bpf_map__delete_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key),  BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Failed to delete the (key,pid) of the process with pid, %d\n", err);
-			goto cleanup;
-		}
-	}
-	else {
-		//parent process
-		printf("Parent process\n");
-        	printf("Child PID: %d\n", pid);
-		
-		//Pid of the process that will execute the read sys call
-		stringkey pid_key = "pid";
-		u32 v = pid;
-		err = bpf_map__update_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key), &v, sizeof(v),  BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Failed to init the process pid, %d\n", err);
-			goto cleanup;
-		}
-			
-		//wait for child process to execute read commmand
-		int status;
-        	wait(&status);
-        	if (WIFEXITED(status)) {
-            		printf("Child process exited with status: %d\n", WEXITSTATUS(status));
-        	}
+                        if (fd == -1) {
+                                perror("Failed to open the file");
+                                exit(1);
+                        }
 
-		u32 accesses, copy_page, sync_accesses, async_accesses;
+                        // Read the file sequentially
+                        offset = 0;
+                        while ((bytes_read = pread(fd, buffer, BUFFER_SIZE, offset)) > 0) {
+                                offset += bytes_read;
+                        }
 
-		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &accesses, sizeof(accesses), BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Lookup key from map error: %d\n", err);
-			goto cleanup;
-		}
+                        // Close the file
+                        close(fd);
 
-		err = bpf_map__lookup_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &copy_page, sizeof(copy_page), BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Lookup key from map error: %d\n", err);
-			goto cleanup;
-		}
+                        u32 accesses, copy_page, sync_accesses, async_accesses;
 
-		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &sync_accesses, sizeof(sync_accesses), BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Lookup key from map error: %d\n", err);
-			goto cleanup;
-		}
+                        err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &accesses, sizeof(accesses), BPF_ANY);
+                        if (err != 0) {
+                                fprintf(stderr, "Lookup key from map error: %d\n", err);
+                                goto cleanup;
+                        }
 
-		err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &async_accesses, sizeof(async_accesses), BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Lookup key from map error: %d\n", err);
-			goto cleanup;
-		}
+                        err = bpf_map__lookup_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &copy_page, sizeof(copy_page), BPF_ANY);
+                        if (err != 0) {
+                                fprintf(stderr, "Lookup key from map error: %d\n", err);
+                                goto cleanup;
+                        }
 
-		printf("Number page accesses : %d\n", accesses);
-		printf("Number page copied to user : %d\n", copy_page);
-		printf("Number page cache misses : %d\n", sync_accesses);
-		printf("Number of prefetched pages : %d\n", async_accesses);
-		double ratio = 0;
-		ratio = ((double)copy_page - sync_accesses) / copy_page;
-		printf("Cache Hit Ratio(%) : %f\n", ratio*100);
-		ratio = 1 - ratio;
-		printf("Cache Miss Ratio(%) : %f\n", ratio*100);
-		ratio = (async_accesses + sync_accesses) > 0 ? (double)async_accesses / (double)(async_accesses + sync_accesses) : 0;
-		printf("Cache Prefetching Ratio(%) : %f\n", ratio*100);
-	}
+                        err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &sync_accesses, sizeof(sync_accesses), BPF_ANY);
+                        if (err != 0) {
+                                fprintf(stderr, "Lookup key from map error: %d\n", err);
+                                goto cleanup;
+                        }
 
-	sleep(1);
+                        err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &async_accesses, sizeof(async_accesses), BPF_ANY);
+                        if (err != 0) {
+                                fprintf(stderr, "Lookup key from map error: %d\n", err);
+                                goto cleanup;
+                        }
+
+                        const char* filename = "result.txt";
+
+                        // Open the file in append mode
+                        FILE* file = fopen(filename, "a");
+                        if (file == NULL) {
+                                printf("Failed to open the file.\n");
+                                goto cleanup;
+                        }
+
+                        fprintf(file, "FILE SIZE = %d Bytes\n", i*1024);
+                        fprintf(file, "Number page accesses : %d\n", accesses);
+                        fprintf(file, "Number page copied to user : %d\n", copy_page);
+                        fprintf(file, "Number page cache misses : %d\n", sync_accesses);
+                        fprintf(file, "Number of prefetched pages : %d\n", async_accesses);
+                        double ratio = 0;
+                        ratio = ((double)copy_page - sync_accesses) / copy_page;
+                        fprintf(file, "Cache Hit Ratio(%%) : %f\n", ratio*100);
+                        ratio = 1 - ratio;
+                        fprintf(file, "Cache Miss Ratio(%%) : %f\n", ratio*100);
+                        ratio = (async_accesses + sync_accesses) > 0 ? (double)async_accesses / (double)(async_accesses + sync_accesses) : 0;
+                        fprintf(file, "Cache Prefetching Ratio(%%) : %f\n", ratio*100);
+                        fprintf(file, "###############################################################\n");
+
+                        // Close the file
+                        fclose(file);
+
+                }
+                //After Read is completed delete the pid of the process. (You don't want to counter accesses anymore !)
+                /*stringkey pid_key = "pid";
+                  err = bpf_map__delete_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key),  BPF_ANY);
+                  if (err != 0) {
+                  fprintf(stderr, "Failed to delete the (key,pid) of the process with pid, %d\n", err);
+                  goto cleanup;
+                  }*/
+
+        }
+        else {
+                //parent process
+                printf("Parent process created Child process with PID: %d\n", pid);
+
+                //Pid of the process that will execute the read sys call
+                /*stringkey pid_key = "pid";
+                  u32 v = pid;
+                  err = bpf_map__update_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key), &v, sizeof(v),  BPF_ANY);
+                  if (err != 0) {
+                  fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                  goto cleanup;
+                  }*/
+
+                //wait for child process to execute read commmand
+                int status;
+                wait(&status);
+                if (WIFEXITED(status)) {
+                        printf("Child process exited with status: %d\n", WEXITSTATUS(status));
+                }
+
+        }
+
+        sleep(1);
 
 cleanup:
-	helloworld_bpf__destroy(skel);
-	return -err;
+        helloworld_bpf__destroy(skel);
+        return -err;
 }
