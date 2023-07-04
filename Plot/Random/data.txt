@@ -8,164 +8,164 @@ Cache Miss Ratio(%) : 100.000000
 Cache Prefetching Ratio(%) : 0.000000
 ###############################################################
 FILE SIZE = 8192 Bytes
-Number page accesses : 3
+Number page accesses : 4
 Number page copied to user : 2
-Number page cache misses : 1
-Number of prefetched pages : 1
+Number page cache misses : 2
+Number of prefetched pages : 0
+Cache Hit Ratio(%) : 0.000000
+Cache Miss Ratio(%) : 100.000000
+Cache Prefetching Ratio(%) : 0.000000
+###############################################################
+FILE SIZE = 16384 Bytes
+Number page accesses : 8
+Number page copied to user : 4
+Number page cache misses : 2
+Number of prefetched pages : 2
 Cache Hit Ratio(%) : 50.000000
 Cache Miss Ratio(%) : 50.000000
 Cache Prefetching Ratio(%) : 50.000000
 ###############################################################
-FILE SIZE = 16384 Bytes
-Number page accesses : 5
-Number page copied to user : 4
-Number page cache misses : 1
-Number of prefetched pages : 3
-Cache Hit Ratio(%) : 75.000000
-Cache Miss Ratio(%) : 25.000000
-Cache Prefetching Ratio(%) : 75.000000
-###############################################################
 FILE SIZE = 32768 Bytes
-Number page accesses : 9
+Number page accesses : 13
 Number page copied to user : 8
-Number page cache misses : 1
-Number of prefetched pages : 7
-Cache Hit Ratio(%) : 87.500000
-Cache Miss Ratio(%) : 12.500000
-Cache Prefetching Ratio(%) : 87.500000
+Number page cache misses : 5
+Number of prefetched pages : 3
+Cache Hit Ratio(%) : 37.500000
+Cache Miss Ratio(%) : 62.500000
+Cache Prefetching Ratio(%) : 37.500000
 ###############################################################
 FILE SIZE = 65536 Bytes
-Number page accesses : 17
+Number page accesses : 25
 Number page copied to user : 16
-Number page cache misses : 1
-Number of prefetched pages : 15
-Cache Hit Ratio(%) : 93.750000
-Cache Miss Ratio(%) : 6.250000
-Cache Prefetching Ratio(%) : 93.750000
+Number page cache misses : 6
+Number of prefetched pages : 10
+Cache Hit Ratio(%) : 62.500000
+Cache Miss Ratio(%) : 37.500000
+Cache Prefetching Ratio(%) : 62.500000
 ###############################################################
 FILE SIZE = 131072 Bytes
-Number page accesses : 31
+Number page accesses : 56
 Number page copied to user : 32
-Number page cache misses : 1
-Number of prefetched pages : 31
-Cache Hit Ratio(%) : 96.875000
-Cache Miss Ratio(%) : 3.125000
-Cache Prefetching Ratio(%) : 96.875000
+Number page cache misses : 11
+Number of prefetched pages : 21
+Cache Hit Ratio(%) : 65.625000
+Cache Miss Ratio(%) : 34.375000
+Cache Prefetching Ratio(%) : 65.625000
 ###############################################################
 FILE SIZE = 262144 Bytes
-Number page accesses : 63
+Number page accesses : 106
 Number page copied to user : 64
-Number page cache misses : 1
-Number of prefetched pages : 63
-Cache Hit Ratio(%) : 98.437500
-Cache Miss Ratio(%) : 1.562500
-Cache Prefetching Ratio(%) : 98.437500
+Number page cache misses : 28
+Number of prefetched pages : 36
+Cache Hit Ratio(%) : 56.250000
+Cache Miss Ratio(%) : 43.750000
+Cache Prefetching Ratio(%) : 56.250000
 ###############################################################
 FILE SIZE = 524288 Bytes
-Number page accesses : 129
+Number page accesses : 202
 Number page copied to user : 128
-Number page cache misses : 1
-Number of prefetched pages : 127
-Cache Hit Ratio(%) : 99.218750
-Cache Miss Ratio(%) : 0.781250
-Cache Prefetching Ratio(%) : 99.218750
+Number page cache misses : 73
+Number of prefetched pages : 55
+Cache Hit Ratio(%) : 42.968750
+Cache Miss Ratio(%) : 57.031250
+Cache Prefetching Ratio(%) : 42.968750
 ###############################################################
 FILE SIZE = 1048576 Bytes
-Number page accesses : 257
+Number page accesses : 408
 Number page copied to user : 256
-Number page cache misses : 1
-Number of prefetched pages : 255
-Cache Hit Ratio(%) : 99.609375
-Cache Miss Ratio(%) : 0.390625
-Cache Prefetching Ratio(%) : 99.609375
+Number page cache misses : 125
+Number of prefetched pages : 131
+Cache Hit Ratio(%) : 51.171875
+Cache Miss Ratio(%) : 48.828125
+Cache Prefetching Ratio(%) : 51.171875
 ###############################################################
 FILE SIZE = 2097152 Bytes
-Number page accesses : 513
+Number page accesses : 801
 Number page copied to user : 512
-Number page cache misses : 1
-Number of prefetched pages : 511
-Cache Hit Ratio(%) : 99.804688
-Cache Miss Ratio(%) : 0.195312
-Cache Prefetching Ratio(%) : 99.804688
+Number page cache misses : 254
+Number of prefetched pages : 258
+Cache Hit Ratio(%) : 50.390625
+Cache Miss Ratio(%) : 49.609375
+Cache Prefetching Ratio(%) : 50.390625
 ###############################################################
 FILE SIZE = 4194304 Bytes
-Number page accesses : 1025
+Number page accesses : 1645
 Number page copied to user : 1024
-Number page cache misses : 1
-Number of prefetched pages : 1023
-Cache Hit Ratio(%) : 99.902344
-Cache Miss Ratio(%) : 0.097656
-Cache Prefetching Ratio(%) : 99.902344
+Number page cache misses : 493
+Number of prefetched pages : 531
+Cache Hit Ratio(%) : 51.855469
+Cache Miss Ratio(%) : 48.144531
+Cache Prefetching Ratio(%) : 51.855469
 ###############################################################
 FILE SIZE = 8388608 Bytes
-Number page accesses : 2049
+Number page accesses : 3338
 Number page copied to user : 2048
-Number page cache misses : 1
-Number of prefetched pages : 2047
-Cache Hit Ratio(%) : 99.951172
-Cache Miss Ratio(%) : 0.048828
-Cache Prefetching Ratio(%) : 99.951172
+Number page cache misses : 962
+Number of prefetched pages : 1086
+Cache Hit Ratio(%) : 53.027344
+Cache Miss Ratio(%) : 46.972656
+Cache Prefetching Ratio(%) : 53.027344
 ###############################################################
 FILE SIZE = 16777216 Bytes
-Number page accesses : 4097
+Number page accesses : 6761
 Number page copied to user : 4096
-Number page cache misses : 1
-Number of prefetched pages : 4095
-Cache Hit Ratio(%) : 99.975586
-Cache Miss Ratio(%) : 0.024414
-Cache Prefetching Ratio(%) : 99.975586
+Number page cache misses : 1754
+Number of prefetched pages : 2342
+Cache Hit Ratio(%) : 57.177734
+Cache Miss Ratio(%) : 42.822266
+Cache Prefetching Ratio(%) : 57.177734
 ###############################################################
 FILE SIZE = 33554432 Bytes
-Number page accesses : 8193
+Number page accesses : 13381
 Number page copied to user : 8192
-Number page cache misses : 1
-Number of prefetched pages : 8191
-Cache Hit Ratio(%) : 99.987793
-Cache Miss Ratio(%) : 0.012207
-Cache Prefetching Ratio(%) : 99.987793
+Number page cache misses : 3721
+Number of prefetched pages : 4471
+Cache Hit Ratio(%) : 54.577637
+Cache Miss Ratio(%) : 45.422363
+Cache Prefetching Ratio(%) : 54.577637
 ###############################################################
 FILE SIZE = 67108864 Bytes
-Number page accesses : 16385
+Number page accesses : 26988
 Number page copied to user : 16384
-Number page cache misses : 1
-Number of prefetched pages : 16383
-Cache Hit Ratio(%) : 99.993896
-Cache Miss Ratio(%) : 0.006104
-Cache Prefetching Ratio(%) : 99.993896
+Number page cache misses : 7327
+Number of prefetched pages : 9057
+Cache Hit Ratio(%) : 55.279541
+Cache Miss Ratio(%) : 44.720459
+Cache Prefetching Ratio(%) : 55.279541
 ###############################################################
 FILE SIZE = 134217728 Bytes
-Number page accesses : 32769
+Number page accesses : 53804
 Number page copied to user : 32768
-Number page cache misses : 1
-Number of prefetched pages : 32767
-Cache Hit Ratio(%) : 99.996948
-Cache Miss Ratio(%) : 0.003052
-Cache Prefetching Ratio(%) : 99.996948
+Number page cache misses : 14769
+Number of prefetched pages : 17999
+Cache Hit Ratio(%) : 54.928589
+Cache Miss Ratio(%) : 45.071411
+Cache Prefetching Ratio(%) : 54.928589
 ###############################################################
 FILE SIZE = 268435456 Bytes
-Number page accesses : 65537
+Number page accesses : 108025
 Number page copied to user : 65536
-Number page cache misses : 1
-Number of prefetched pages : 65535
-Cache Hit Ratio(%) : 99.998474
-Cache Miss Ratio(%) : 0.001526
-Cache Prefetching Ratio(%) : 99.998474
+Number page cache misses : 29357
+Number of prefetched pages : 36179
+Cache Hit Ratio(%) : 55.204773
+Cache Miss Ratio(%) : 44.795227
+Cache Prefetching Ratio(%) : 55.204773
 ###############################################################
 FILE SIZE = 536870912 Bytes
-Number page accesses : 131073
+Number page accesses : 215216
 Number page copied to user : 131072
-Number page cache misses : 1
-Number of prefetched pages : 131071
-Cache Hit Ratio(%) : 99.999237
-Cache Miss Ratio(%) : 0.000763
-Cache Prefetching Ratio(%) : 99.999237
+Number page cache misses : 59577
+Number of prefetched pages : 71495
+Cache Hit Ratio(%) : 54.546356
+Cache Miss Ratio(%) : 45.453644
+Cache Prefetching Ratio(%) : 54.546356
 ###############################################################
 FILE SIZE = 1073741824 Bytes
-Number page accesses : 262144
+Number page accesses : 430834
 Number page copied to user : 262144
-Number page cache misses : 1
-Number of prefetched pages : 262143
-Cache Hit Ratio(%) : 99.999619
-Cache Miss Ratio(%) : 0.000381
-Cache Prefetching Ratio(%) : 99.999619
+Number page cache misses : 118443
+Number of prefetched pages : 143701
+Cache Hit Ratio(%) : 54.817581
+Cache Miss Ratio(%) : 45.182419
+Cache Prefetching Ratio(%) : 54.817581
 ###############################################################
