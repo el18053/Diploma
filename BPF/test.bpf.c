@@ -318,11 +318,24 @@ int trace_page_cache_lru(struct pt_regs *ctx)
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
                 //bpf_printk("add_to_page_cache_lru started");
-
-                stringkey first_sync_ra_key = "first_sync_ra";
+		
+		stringkey first_sync_ra_key = "first_sync_ra";
                 u32 *v = NULL;
                 v = bpf_map_lookup_elem(&execve_counter, &first_sync_ra_key);
-                if (v != NULL && *v == 1) {
+                
+		stringkey prefetched_sync_ra_key = "prefetched_sync_ra";
+		u32 *v2 = NULL;
+		v2 = bpf_map_lookup_elem(&execve_counter, &prefetched_sync_ra_key);
+		if (v != NULL && *v == 0 && v2 != NULL && *v2 == 1) {
+			stringkey new_key = "async_accessed";
+			u32 *async_accesses = NULL;
+			async_accesses = bpf_map_lookup_elem(&execve_counter, &new_key);
+			if (async_accesses != NULL) {
+				*async_accesses += 1;
+			}
+		}
+		
+		if (v != NULL && *v == 1) {
                         stringkey new_key = "sync_accessed";
                         u32 *sync_accesses = NULL;
                         sync_accesses = bpf_map_lookup_elem(&execve_counter, &new_key);
@@ -332,19 +345,6 @@ int trace_page_cache_lru(struct pt_regs *ctx)
                         }
 
                 }
-
-		stringkey prefetched_sync_ra_key = "prefetched_sync_ra";
-		v = NULL;
-		v = bpf_map_lookup_elem(&execve_counter, &prefetched_sync_ra_key);
-		if (v != NULL && *v == 1) {
-			stringkey new_key = "async_accessed";
-			u32 *async_accesses = NULL;
-			async_accesses = bpf_map_lookup_elem(&execve_counter, &new_key);
-			if (async_accesses != NULL) {
-				*async_accesses += 1;
-			}
-		}
-
 
                 stringkey async_ra_key = "async_ra";
                 v = NULL;
