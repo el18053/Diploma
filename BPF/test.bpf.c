@@ -369,14 +369,18 @@ int trace_copy_page_to_iter(struct pt_regs *ctx)
 {
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
-                //bpf_printk("copy_page_to_iter started");
+
+		//size_t offset = PT_REGS_PARM2(ctx); 
+		//size_t bytes = PT_REGS_PARM3(ctx);
+
+		//bpf_printk("copy_page_to_iter started with offset=%d, bytes=%d", offset, bytes);
 
                 stringkey new_key = "copy_page_to_iter";
                 u32 *v = NULL;
                 v = bpf_map_lookup_elem(&execve_counter, &new_key);
                 if (v != NULL) {
                         if ( PT_REGS_RC(ctx) )
-                                *v += 1;
+				*v += 1;
                 }
         }
 
