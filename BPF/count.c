@@ -159,9 +159,9 @@ int main(int argc, char **argv)
                         }
 
                         printf("FILE SIZE = %d Bytes\n", i*1024);
-                        printf("Number page copied to user : %d\n", copy_page);
-                        printf("Number page cache misses : %d\n", sync_accesses);
-                        printf("Number of prefetched pages : %d\n", async_accesses);
+                        printf("Number of page(s) copied to user : %d\n", copy_page);
+                        printf("Number of Sync fetcted page(s) : %d\n", sync_accesses);
+                        printf("Number of Async fetched page(s) : %d\n", async_accesses);
                         double ratio = 0;
                         ratio = ((double)copy_page - sync_accesses) / copy_page;
                         printf("Cache Hit Ratio(%%) : %f\n", ratio*100);
