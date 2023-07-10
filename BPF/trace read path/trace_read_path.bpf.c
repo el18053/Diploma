@@ -204,7 +204,8 @@ SEC("kprobe/page_cache_next_miss")
 int trace_page_cache_next_miss(struct pt_regs *ctx) {
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
-                bpf_printk("page_cache_next_miss started");
+		int index = PT_REGS_PARM2(ctx);
+                bpf_printk("page_cache_next_miss started with index=%d", index);
         }
 
         return 0;
@@ -230,7 +231,19 @@ int trace_page_cache_ra_unbounded(struct pt_regs *ctx) {
         {
                 int nr_to_read = PT_REGS_PARM2(ctx);
                 int lookahead_size = PT_REGS_PARM3(ctx);
+
                 bpf_printk("page_cache_ra_unbounded started with nr_to_read=%d and lookahead_size=%d", nr_to_read, lookahead_size);
+	}
+
+        return 0;
+}
+
+SEC("kretprobe/page_cache_ra_unbounded")
+
+int trace_page_cache_ra_unbounded_exit(struct pt_regs *ctx) {
+        if ( get_access(bpf_get_current_pid_tgid()) )
+        {
+		bpf_printk("page_cache_ra_unbounded exited");
         }
 
         return 0;
@@ -266,7 +279,9 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 {
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
-                bpf_printk("add_to_page_cache_lru started");
+		int offset = PT_REGS_PARM3(ctx);
+
+                bpf_printk("add_to_page_cache_lru started with offset : %d", offset);
         }
 
         return 0;
@@ -282,7 +297,9 @@ int trace_copy_page_to_iter(struct pt_regs *ctx)
 		size_t offset = PT_REGS_PARM2(ctx); 
 		size_t bytes = PT_REGS_PARM3(ctx);
 
-		bpf_printk("copy_page_to_iter started with offset=%d, bytes=%d", offset, bytes);
+		size_t return_bytes = PT_REGS_RC(ctx);
+
+		bpf_printk("copy_page_to_iter with offset=%d, bytes=%d returned : %d bytes", offset, bytes, return_bytes);
         }
 
         return 0;
