@@ -12,25 +12,25 @@ typedef __u64 u64;
 typedef char stringkey[64];
 
 typedef unsigned long pgoff_t;
-typedef __kernel_loff_t loff_t;
+typedef __kernel_loff_t	loff_t;
 
 struct file_ra_state {
-        pgoff_t start;
-        unsigned int size;
-        unsigned int async_size;
-        unsigned int ra_pages;
-        unsigned int mmap_miss;
-        loff_t prev_pos;
+	pgoff_t start;
+	unsigned int size;
+	unsigned int async_size;
+	unsigned int ra_pages;
+	unsigned int mmap_miss;
+	loff_t prev_pos;
 };
 
 struct readahead_control {
-        struct file *file;
-        struct address_space *mapping;
-        struct file_ra_state *ra;
+	struct file *file;
+	struct address_space *mapping;
+	struct file_ra_state *ra;
 /* private: use the readahead_* accessors instead */
-        pgoff_t _index;
-        unsigned int _nr_pages;
-        unsigned int _batch_count;
+	pgoff_t _index;
+	unsigned int _nr_pages;
+	unsigned int _batch_count;
 };
 
 struct {
@@ -149,7 +149,7 @@ int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
                 int req_count = 0;
                 req_count = PT_REGS_PARM2(ctx);
                 bpf_printk("page_cache_sync_ra started with req_count=%d", req_count);
-        }
+	}
 
         return 0;
 }
@@ -216,21 +216,27 @@ int trace_ondemand_readahead_enter(struct pt_regs *ctx) {
                 bool hit_readahead_marker = PT_REGS_PARM2(ctx);
                 int req_size = PT_REGS_PARM3(ctx);
                 bpf_printk("ondemand_readahead started with req_size=%d, hit_readahead_marker=%d", req_size, (int)hit_readahead_marker);
+        	
+		struct readahead_control ractl;
 
-                struct readahead_control ractl;
+    		// Use bpf_probe_read() to read the necessary data structures from kernel memory
+    		bpf_probe_read(&ractl, sizeof(struct readahead_control), (void *)PT_REGS_PARM1(ctx));
 
-                // Use bpf_probe_read() to read the necessary data structures from kernel memory
-                bpf_probe_read(&ractl, sizeof(struct readahead_control), (void *)PT_REGS_PARM1(ctx));
+		struct file_ra_state ra;
+		
+		bpf_probe_read(&ra, sizeof(struct file_ra_state), (void *)ractl.ra);
+		
+		bpf_printk("");
+		bpf_printk("rac->_index The index of the first page in this readahead reqeuest : %d", ractl._index);
+		bpf_printk("file_ra_state ra :");
+		bpf_printk("ra->start Where the most recent readahead started : %d", ra.start); 
+		bpf_printk("ra->size Number of pages read in the most recent readahead : %d", ra.size);
+		bpf_printk("ra->async_size Start next readahead when this many pages are left : %d", ra.async_size);
+		bpf_printk("ra->ra_pages Maximum size of a readahead request : %d", ra.ra_pages);
+		bpf_printk("ra->mmap_misses How many mmap accesses missed in the page cache : %d", ra.mmap_miss);
+		bpf_printk("ra->prev_pos The last byte in the most recent read request : %d\n", ra.prev_pos);
 
-                struct file_ra_state ra;
-
-                bpf_probe_read(&ra, sizeof(struct file_ra_state), (void *)ractl.ra);
-
-                bpf_printk("TEST TEST TEST : ra->start=%d\n", ra.start);
-                bpf_printk("TEST TEST TEST : ra->size=%d\n", ra.size);
-                bpf_printk("TEST TEST TEST : ra->async_size=%d\n", ra.async_size);
-
-        }
+	}
 
         return 0;
 }
@@ -240,7 +246,7 @@ SEC("kprobe/page_cache_next_miss")
 int trace_page_cache_next_miss(struct pt_regs *ctx) {
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
-                int index = PT_REGS_PARM2(ctx);
+		int index = PT_REGS_PARM2(ctx);
                 bpf_printk("page_cache_next_miss started with index=%d", index);
         }
 
@@ -269,7 +275,7 @@ int trace_page_cache_ra_unbounded(struct pt_regs *ctx) {
                 int lookahead_size = PT_REGS_PARM3(ctx);
 
                 bpf_printk("page_cache_ra_unbounded started with nr_to_read=%d and lookahead_size=%d", nr_to_read, lookahead_size);
-        }
+	}
 
         return 0;
 }
@@ -279,7 +285,7 @@ SEC("kretprobe/page_cache_ra_unbounded")
 int trace_page_cache_ra_unbounded_exit(struct pt_regs *ctx) {
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
-                bpf_printk("page_cache_ra_unbounded exited");
+		bpf_printk("page_cache_ra_unbounded exited");
         }
 
         return 0;
@@ -301,12 +307,12 @@ SEC("kprobe/__page_cache_alloc")
 
 int trace_page_cache_alloc(void *ctx) {
 
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                bpf_printk("page_cache_alloc started");
-        }
+	if ( get_access(bpf_get_current_pid_tgid()) )
+  	{
+  		bpf_printk("page_cache_alloc started");
+  	}
 
-        return 0;
+  	return 0;
  }
 
 SEC("kprobe/add_to_page_cache_lru")
@@ -315,7 +321,7 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 {
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
-                int offset = PT_REGS_PARM3(ctx);
+		int offset = PT_REGS_PARM3(ctx);
 
                 bpf_printk("add_to_page_cache_lru started with offset : %d", offset);
         }
@@ -330,12 +336,12 @@ int trace_copy_page_to_iter(struct pt_regs *ctx)
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
 
-                size_t offset = PT_REGS_PARM2(ctx);
-                size_t bytes = PT_REGS_PARM3(ctx);
+		size_t offset = PT_REGS_PARM2(ctx); 
+		size_t bytes = PT_REGS_PARM3(ctx);
 
-                size_t return_bytes = PT_REGS_RC(ctx);
+		size_t return_bytes = PT_REGS_RC(ctx);
 
-                bpf_printk("copy_page_to_iter with offset=%d, bytes=%d returned : %d bytes", offset, bytes, return_bytes);
+		bpf_printk("copy_page_to_iter with offset=%d, bytes=%d returned : %d bytes", offset, bytes, return_bytes);
         }
 
         return 0;
