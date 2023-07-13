@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 
 		int bs = 4; //bs stands for block size
 		int fs = 128; //fs stands for file size
-		int rs = 64; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
+		int rs = 24; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
 
 		/*
 		// Create file to read
@@ -126,7 +126,7 @@ int main(int argc, char **argv)
 		*/
 		// /*
 		//Empty Cache
-		int result = 0; //system("echo 1 > /proc/sys/vm/drop_caches");
+		int result = system("echo 1 > /proc/sys/vm/drop_caches");
 
 		if (result == -1) {
 			printf("Failed to empty cache.\n");
