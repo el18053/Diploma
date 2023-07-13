@@ -8,12 +8,14 @@
 #include <bpf/libbpf.h>
 #include "trace_read_path.skel.h"
 
+
 #define BUFFER_SIZE 4096
+
 
 typedef __u64 u64;
 typedef __u32 u32;
 typedef char stringkey[64];
-
+typedef char stringinput[128];
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
@@ -66,8 +68,17 @@ int main(int argc, char **argv)
 		//child process
 		printf("Child process started\n");
 
+		stringkey key = "key";
+		int init_key = 0;
+		err = bpf_map__update_elem(skel->maps.execve_counter, &key, sizeof(key), &init_key, sizeof(init_key),  BPF_ANY);
+		if (err != 0) {
+			fprintf(stderr, "Failed to save key %d\n", err);
+			goto cleanup;
+		}
+
 		int bs = 4; //bs stands for block size
-		int fs = 1024; //fs stands for file size
+		int fs = 128; //fs stands for file size
+		int rs = 64; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
 
 		/*
 		// Create file to read
@@ -93,7 +104,7 @@ int main(int argc, char **argv)
 
 		const char *file_path = "output.txt";
 		int fd;
-		char buffer[bs];
+		char buffer[BUFFER_SIZE];
 		ssize_t bytes_read, offset = 0;
 
 		// Open the file
@@ -106,14 +117,14 @@ int main(int argc, char **argv)
 
 		// Read the file sequentially
 		offset = 0;
-		while ((bytes_read = pread(fd, buffer, bs, offset)) > 0) {
+		while ((bytes_read = pread(fd, buffer, BUFFER_SIZE, offset)) > 0) {
 		offset += bytes_read;
 		}
 
 		// Close the file
 		close(fd);
 		*/
-
+		// /*
 		//Empty Cache
 		int result = 0; //system("echo 1 > /proc/sys/vm/drop_caches");
 
@@ -123,7 +134,7 @@ int main(int argc, char **argv)
 		}
 
 		char fioCommand[100];
-		sprintf(fioCommand, "SIZE=%dk BLOCK_SIZE=%dk fio test.fio", fs, bs);
+		sprintf(fioCommand, "FILESIZE=%dk BLOCK_SIZE=%dk READSIZE=%dK fio readfile.fio", fs, bs, rs);
 
 		// Execute the FIO command
 		result = system(fioCommand);
@@ -133,6 +144,26 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
+		int key_size;
+		err = bpf_map__lookup_elem(skel->maps.execve_counter, &key, sizeof(key),  &key_size, sizeof(key_size), BPF_ANY);
+		if (err != 0) {
+			fprintf(stderr, "Failed to retreive key_size, err= %d\n", err);
+			goto cleanup;
+		}
+
+		FILE* file = fopen("log.txt", "w");
+		if (file == NULL) {
+			printf("Failed to open the file.\n");
+			goto cleanup;
+		}
+
+		for (int i=0; i < key_size; i++) {
+			stringinput message;
+			err = bpf_map__lookup_elem(skel->maps.log_file, &i, sizeof(i), message, sizeof(message), BPF_ANY);
+			fprintf(file, "%s\n", message);
+		}	       
+
+		fclose(file);
 
 		//After Read is completed delete the pid of the process. (You don't want to counter accesses anymore !)
 		/*stringkey pid_key = "pid";
