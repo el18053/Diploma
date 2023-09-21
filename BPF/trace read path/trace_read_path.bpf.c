@@ -1,10 +1,18 @@
+#define pr_fmt(fmt) "%s: " fmt, __func__
+#define pr_info(fmt, ...) \
+	bpf_printk(pr_fmt(fmt), ##__VA_ARGS__)
+
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+#include <bpf/bpf_core_read.h>
 #include <linux/ptrace.h>
 #include <linux/types.h>
 #include <stddef.h>
 #include <stdbool.h>
+
+
+int bring_pages = 0;
 
 typedef __u32 u32;
 typedef __u64 u64;
@@ -124,23 +132,12 @@ int trace_pread64(struct pt_regs *ctx) {
 	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
 	if (v == NULL) {
 		bpf_printk("ksys_pread64 started from process with pid:%d", uid);
-
 		
 		int key = get_key();
-		/*
-		stringinput message;
-		char str[] = "ksys_pread64 started from process with pid:    ";
-		char uid_str[] = "    ";
-		intToString(uid, uid_str);
-		
-		bpf_probe_read_str(message, sizeof(str), str);
-		
-		bpf_probe_read_str(message + sizeof(str), sizeof(message), uid_str);
-		*/
-		
-		stringinput message = "ksys_pread64 started";
+		stringinput message = "";
+		BPF_SNPRINTF(message, sizeof(message), "ksys_pread64 started from process with pid:%d", uid);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
-		
+
 		v = &uid;
 		bpf_map_update_elem(&execve_counter, &pid_key, v, BPF_ANY);
 	}
@@ -232,9 +229,9 @@ int trace_filemap_get_read_batch(struct pt_regs *ctx) {
 		int last_index = PT_REGS_PARM3(ctx);
 		bpf_printk("filemap_get_read_batch started with index=%d, last_index=%d", index, last_index);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "filemap_get_read_batch started");
+		BPF_SNPRINTF(message, sizeof(message), "filemap_get_read_batch started with index=%d, last_index=%d", index, last_index);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
@@ -252,10 +249,54 @@ int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
 		req_count = PT_REGS_PARM2(ctx);
 		bpf_printk("page_cache_sync_ra started with req_count=%d", req_count);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "page_cache_sync_ra started");
+		BPF_SNPRINTF(message, sizeof(message), "page_cache_sync_ra started with req_count=%d", req_count);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
+
+		//time to bring some pages of our own
+		struct readahead_control ractl;
+		bpf_probe_read(&ractl, sizeof(struct readahead_control), (void *)PT_REGS_PARM1(ctx));
+		if(bring_pages == 0)
+		{
+			int i, nr_pages = 32;
+			int indexes[32] = {
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24,
+				25,
+				26,
+				27,
+				28,
+				29,
+				30,
+				31,
+			};
+			//bpf_simos(&ractl, nr_pages, indexes);
+			bring_pages += 1;
+		}
 	}
 
 	return 0;
@@ -290,9 +331,9 @@ int trace_page_cache_async_ra_enter(struct pt_regs *ctx)
 		req_count = PT_REGS_PARM3(ctx);
 		bpf_printk("page_cache_async_ra started with req_count=%d", req_count);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "page_cache_async_ra started");
+		BPF_SNPRINTF(message, sizeof(message), "page_cache_async_ra started with req_count=%d", req_count);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
@@ -326,9 +367,9 @@ int trace_force_page_cache_ra(struct pt_regs *ctx) {
 		req_count = PT_REGS_PARM2(ctx);
 		bpf_printk("force_page_cache_ra started with req_count=%d", req_count);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "force_page_cache_ra started");
+		BPF_SNPRINTF(message, sizeof(message), "force_page_cache_ra started with req_count=%d", req_count);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
@@ -344,9 +385,9 @@ int trace_ondemand_readahead_enter(struct pt_regs *ctx) {
 		int req_size = PT_REGS_PARM3(ctx);
 		bpf_printk("ondemand_readahead started with req_size=%d, hit_readahead_marker=%d", req_size, (int)hit_readahead_marker);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "ondemand_readahead started");
+		BPF_SNPRINTF(message, sizeof(message), "ondemand_readahead started with req_size=%d, hit_readahead_marker=%d", req_size, (int)hit_readahead_marker);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 
 		struct readahead_control ractl;
@@ -373,6 +414,26 @@ int trace_ondemand_readahead_enter(struct pt_regs *ctx) {
 	return 0;
 }
 
+SEC("kprobe/my_custom_function_2")
+
+int trace_my_custom_function(struct pt_regs *ctx) {
+	if ( get_access(bpf_get_current_pid_tgid()) )
+	{
+		bpf_printk("\n ***my_custom_function started***\n");
+	}
+	return 0;
+}
+
+SEC("kretprobe/my_custom_function_2")
+
+int trace_return_my_custom_function(struct pt_regs *ctx) {
+	if ( get_access(bpf_get_current_pid_tgid()) )
+	{
+		bpf_printk("\n ***my_custom_function finished***\n");
+	}
+	return 0;
+}
+
 SEC("kprobe/page_cache_next_miss")
 
 int trace_page_cache_next_miss(struct pt_regs *ctx) {
@@ -381,9 +442,9 @@ int trace_page_cache_next_miss(struct pt_regs *ctx) {
 		int index = PT_REGS_PARM2(ctx);
 		bpf_printk("page_cache_next_miss started with index=%d", index);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "page_cache_next_miss started");
+		BPF_SNPRINTF(message, sizeof(message), "page_cache_next_miss started with index=%d", index);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
@@ -399,9 +460,9 @@ int trace_do_page_cache_ra(struct pt_regs *ctx) {
 		int async_size = PT_REGS_PARM3(ctx);
 		bpf_printk("do_page_cache_ra started with req_size=%d, async_size=%d", req_size, async_size);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "do_page_cache_ra started");
+		BPF_SNPRINTF(message, sizeof(message), "do_page_cache_ra started with req_size=%d, async_size=%d", req_size, async_size);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
@@ -418,9 +479,9 @@ int trace_page_cache_ra_unbounded(struct pt_regs *ctx) {
 
 		bpf_printk("page_cache_ra_unbounded started with nr_to_read=%d and lookahead_size=%d", nr_to_read, lookahead_size);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "page_cache_ra_unbounded started");
+		BPF_SNPRINTF(message, sizeof(message), "page_cache_ra_unbounded started nr_to_read=%d and lookahead_size=%d", nr_to_read, lookahead_size);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
@@ -451,9 +512,9 @@ int trace_read_pages(struct pt_regs *ctx) {
 		bool skip_page = PT_REGS_PARM3(ctx);
 		bpf_printk("read_pages started with skip_page=%d", (int)skip_page);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "read_pages started");
+		BPF_SNPRINTF(message, sizeof(message), "read_pages started with skip_page=%d", (int)skip_page);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
@@ -487,14 +548,31 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 
 		bpf_printk("add_to_page_cache_lru started with offset : %d", offset);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "add_to_page_cache_lru started");
+		BPF_SNPRINTF(message, sizeof(message), "add_to_page_cache_lru started with offset : %d", offset);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
 	return 0;
 }
+
+SEC("kprobe/__add_to_page_cache_locked")
+
+int trace_add_to_page_cache_lru(struct pt_regs *ctx) {
+	if( get_access(bpf_get_current_pid_tgid()) )
+	{
+		bpf_printk("__add_to_page_cache_lru");
+		/*if( something == 0)
+		  {
+		  bpf_override_return(ctx, -1);
+		  something += 1;
+		  }*/
+	}
+	return 0;
+
+}
+
 
 SEC("kretprobe/copy_page_to_iter")
 
@@ -510,9 +588,9 @@ int trace_copy_page_to_iter(struct pt_regs *ctx)
 
 		bpf_printk("copy_page_to_iter with offset=%d, bytes=%d returned : %d bytes", offset, bytes, return_bytes);
 
-		stringinput message;
+		stringinput message = "";
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "copy_page_to_iter started");
+		BPF_SNPRINTF(message, sizeof(message), "copy_page_to_iter with offset=%d, bytes=%d returned : %d bytes", offset, bytes, return_bytes);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
