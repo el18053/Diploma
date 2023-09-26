@@ -1,45 +1,15 @@
-#define pr_fmt(fmt) "%s: " fmt, __func__
-#define pr_info(fmt, ...) \
-	bpf_printk(pr_fmt(fmt), ##__VA_ARGS__)
+#include "vmlinux.h"
 
-#include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
-#include <linux/ptrace.h>
-#include <linux/types.h>
-#include <stddef.h>
 #include <stdbool.h>
 
 
 int bring_pages = 0;
 
-typedef __u32 u32;
-typedef __u64 u64;
 typedef char stringkey[64];
 typedef char stringinput[128];
-
-typedef unsigned long pgoff_t;
-typedef __kernel_loff_t	loff_t;
-
-struct file_ra_state {
-	pgoff_t start;
-	unsigned int size;
-	unsigned int async_size;
-	unsigned int ra_pages;
-	unsigned int mmap_miss;
-	loff_t prev_pos;
-};
-
-struct readahead_control {
-	struct file *file;
-	struct address_space *mapping;
-	struct file_ra_state *ra;
-	/* private: use the readahead_* accessors instead */
-	pgoff_t _index;
-	unsigned int _nr_pages;
-	unsigned int _batch_count;
-};
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -56,43 +26,12 @@ struct {
 	__type(value, stringinput);
 } log_file SEC(".maps");
 
-void intToString(int num, char* str) {
-	int i = 0;
-	int isNegative = 0;
-
-	// Handle negative numbers
-	if (num < 0) {
-		isNegative = 1;
-		num = -num;
-	}
-
-	// Convert digits to characters in reverse order
-	for(int j = 0; j < 4; j++) {
-		if ( num > 0)
-		{
-			str[i++] = num % 10 + '0';
-			num /= 10;
-		}
-		else
-			break;
-	}
-
-	// Add the negative sign if necessary
-	if (isNegative) {
-		str[i++] = '-';
-	}
-
-	// Reverse the string
-	int length = i;
-	for (int j = 0; j < length / 2; j++) {
-		char temp = str[j];
-		str[j] = str[length - j - 1];
-		str[length - j - 1] = temp;
-	}
-
-	// Add the null terminator
-	str[i] = '\0';
-}
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1024*1024);
+	__type(key, int);
+	__type(value, int);
+} index_map SEC(".maps");
 
 int get_access(u32 process_pid)
 {
@@ -197,7 +136,18 @@ int trace_filemap_get_pages(struct pt_regs *ctx) {
 		int key = get_key();
 		bpf_probe_read_str(message, sizeof(message), "filemap_get_pages started");
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
-	}
+		
+		struct kiocb *iocb = (struct kiocb *)PT_REGS_PARM1(ctx);
+
+		//struct kiocb iocb;
+		//bpf_probe_read(&iocb, sizeof(struct kiocb), (void*)PT_REGS_PARM1(ctx));
+
+		if (bring_pages == 0)
+		{
+			bring_pages = 1;
+			bpf_simos(iocb, &index_map);
+		}	
+	}	
 
 	return 0;
 }
@@ -257,46 +207,15 @@ int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
 		//time to bring some pages of our own
 		struct readahead_control ractl;
 		bpf_probe_read(&ractl, sizeof(struct readahead_control), (void *)PT_REGS_PARM1(ctx));
-		if(bring_pages == 0)
+		/*if(bring_pages == 0)
 		{
-			int i, nr_pages = 32;
-			int indexes[32] = {
-				0,
-				1,
-				2,
-				3,
-				4,
-				5,
-				6,
-				7,
-				8,
-				9,
-				10,
-				11,
-				12,
-				13,
-				14,
-				15,
-				16,
-				17,
-				18,
-				19,
-				20,
-				21,
-				22,
-				23,
-				24,
-				25,
-				26,
-				27,
-				28,
-				29,
-				30,
-				31,
-			};
-			//bpf_simos(&ractl, nr_pages, indexes);
+			int nr_pages = 10;
+			stringkey indexes_key = "indexes";
+			int *indexes = bpf_map_lookup_elem(&index_map, &indexes_key);
+			if(indexes != NULL)
+				bpf_simos(&ractl, nr_pages - 1, indexes);
 			bring_pages += 1;
-		}
+		}*/
 	}
 
 	return 0;
@@ -417,10 +336,10 @@ int trace_ondemand_readahead_enter(struct pt_regs *ctx) {
 SEC("kprobe/my_custom_function_2")
 
 int trace_my_custom_function(struct pt_regs *ctx) {
-	if ( get_access(bpf_get_current_pid_tgid()) )
-	{
+	//if ( get_access(bpf_get_current_pid_tgid()) )
+	//{
 		bpf_printk("\n ***my_custom_function started***\n");
-	}
+	//}
 	return 0;
 }
 
