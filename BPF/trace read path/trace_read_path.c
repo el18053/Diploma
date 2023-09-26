@@ -8,7 +8,6 @@
 #include <bpf/libbpf.h>
 #include "trace_read_path.skel.h"
 
-
 #define BUFFER_SIZE 4096
 
 
@@ -76,55 +75,28 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
+		int i = 0, nr_pages = 128;
+		
+		err = bpf_map__update_elem(skel->maps.index_map, &i, sizeof(i), &nr_pages, sizeof(nr_pages), BPF_ANY);
+		if (err != 0) {
+			fprintf(stderr, "Failed to create indexes array err=%d", err);
+			goto cleanup;
+		}
+
+		for(i = 0; i < nr_pages; i++) 
+		{
+			int j = i + 1;
+			err = bpf_map__update_elem(skel->maps.index_map, &j, sizeof(j), &i, sizeof(i), BPF_ANY);
+			if (err != 0) {
+				fprintf(stderr, "Failed to create indexes array err=%d", err);
+				goto cleanup;
+			}
+		}
+
 		int bs = 4; //bs stands for block size
 		int fs = 128; //fs stands for file size
-		int rs = 24; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
+		int rs = fs; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
 
-		/*
-		// Create file to read
-		char command[100];
-		sprintf(command, "python3 create_file.py %d", fs);
-
-		int result = system(command);
-
-		if (result == -1) {
-		printf("Failed to create file.\n");
-		goto cleanup;
-		}
-
-		//Empty Cache
-		result = system("echo 1 > /proc/sys/vm/drop_caches");
-
-		if (result == -1) {
-		printf("Failed to empty cache.\n");
-		goto cleanup;
-		}
-
-		// trigger our BPF program 
-
-		const char *file_path = "output.txt";
-		int fd;
-		char buffer[BUFFER_SIZE];
-		ssize_t bytes_read, offset = 0;
-
-		// Open the file
-		fd = open(file_path, O_RDONLY);
-
-		if (fd == -1) {
-		perror("Failed to open the file");
-		exit(1);
-		}
-
-		// Read the file sequentially
-		offset = 0;
-		while ((bytes_read = pread(fd, buffer, BUFFER_SIZE, offset)) > 0) {
-		offset += bytes_read;
-		}
-
-		// Close the file
-		close(fd);
-		*/
-		// /*
 		//Empty Cache
 		int result = system("echo 1 > /proc/sys/vm/drop_caches");
 
@@ -141,6 +113,14 @@ int main(int argc, char **argv)
 
 		if (result == -1) {
 			printf("Failed to execute FIO command.\n");
+			goto cleanup;
+		}
+
+		//Delete test file created by fio (it creates future hazzards)
+		result = system("rm test");
+
+		if (result == -1) {
+			printf("Failed to empty cache.\n");
 			goto cleanup;
 		}
 
