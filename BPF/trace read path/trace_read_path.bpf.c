@@ -6,8 +6,6 @@
 #include <stdbool.h>
 
 
-int bring_pages = 0;
-
 typedef char stringkey[64];
 typedef char stringinput[128];
 
@@ -141,11 +139,16 @@ int trace_filemap_get_pages(struct pt_regs *ctx) {
 
 		//struct kiocb iocb;
 		//bpf_probe_read(&iocb, sizeof(struct kiocb), (void*)PT_REGS_PARM1(ctx));
-
-		if (bring_pages == 0)
+		
+		stringkey bring_page_key = "bring_page";
+		int *bring_pages = bpf_map_lookup_elem(&execve_counter, &bring_page_key);
+		if (bring_pages != NULL)
 		{
-			bring_pages = 1;
-			bpf_simos(iocb, &index_map);
+			if (*bring_pages == 0)
+			{
+				*bring_pages = 1;
+				bpf_simos(iocb, &index_map);
+			}
 		}	
 	}	
 
