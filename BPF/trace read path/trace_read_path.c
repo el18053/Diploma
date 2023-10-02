@@ -62,10 +62,12 @@ int main(int argc, char **argv)
 	}
 
 	else if (pid == 0) {
-		sleep(1);
 
 		//child process
 		printf("Child process started\n");
+		
+		int file_size = 512;
+		sleep(1);
 
 		stringkey key = "key";
 		int init_key = 0;
@@ -75,7 +77,15 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
-		int i = 0, nr_pages = 128;
+		stringkey bring_page_key = "bring_page";
+		int bring_page = 0;
+		err = bpf_map__update_elem(skel->maps.execve_counter, &bring_page_key, sizeof(bring_page_key), &bring_page, sizeof(bring_page),  BPF_ANY);
+		if (err != 0) {
+			fprintf(stderr, "Failed to save key %d\n", err);
+			goto cleanup;
+		}
+
+		int i = 0, nr_pages = file_size / 4;
 		
 		err = bpf_map__update_elem(skel->maps.index_map, &i, sizeof(i), &nr_pages, sizeof(nr_pages), BPF_ANY);
 		if (err != 0) {
@@ -94,7 +104,7 @@ int main(int argc, char **argv)
 		}
 
 		int bs = 4; //bs stands for block size
-		int fs = 128; //fs stands for file size
+		int fs = file_size; //fs stands for file size
 		int rs = fs; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
 
 		//Empty Cache
@@ -141,30 +151,20 @@ int main(int argc, char **argv)
 			stringinput message;
 			err = bpf_map__lookup_elem(skel->maps.log_file, &i, sizeof(i), message, sizeof(message), BPF_ANY);
 			fprintf(file, "%s\n", message);
-		}	       
+		}
 
 		fclose(file);
-
-		//After Read is completed delete the pid of the process. (You don't want to counter accesses anymore !)
-		/*stringkey pid_key = "pid";
-		  err = bpf_map__delete_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key),  BPF_ANY);
-		  if (err != 0) {
-		  fprintf(stderr, "Failed to delete the (key,pid) of the process with pid, %d\n", err);
-		  goto cleanup;
-		  }*/
+		
+		result = system("cat log.txt | grep add");
+		if (result == -1)
+		{
+			printf("error: cat log.txt\n");
+			goto cleanup;
+		}
 	}
 	else {
 		//parent process
 		printf("Parent process created Child process with PID: %d\n", pid);
-
-		//Pid of the process that will execute the read sys call
-		/*stringkey pid_key = "pid";
-		  u32 v = pid;
-		  err = bpf_map__update_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key), &v, sizeof(v),  BPF_ANY);
-		  if (err != 0) {
-		  fprintf(stderr, "Failed to init the process pid, %d\n", err);
-		  goto cleanup;
-		  }*/
 
 		//wait for child process to execute read commmand
 		int status;
