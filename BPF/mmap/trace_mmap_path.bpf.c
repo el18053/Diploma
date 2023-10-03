@@ -58,6 +58,9 @@ int get_key() {
 SEC("kprobe/filemap_fault")
 
 int trace_filemap_fault(struct pt_regs *ctx) {
+	//stringkey comm;
+	//bpf_get_current_comm(&comm, sizeof(comm));
+	
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		bpf_printk("filemap_fault started");
@@ -76,7 +79,7 @@ int trace_filemap_fault(struct pt_regs *ctx) {
 			if (*bring_pages == 0)
 			{
 				*bring_pages = 1;
-				//bpf_simos(vmf, &index_map);
+				bpf_simos(vmf, &index_map);
 			}
 		}	
 	}	
