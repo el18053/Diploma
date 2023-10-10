@@ -66,20 +66,12 @@ int main(int argc, char **argv)
 		//child process
 		printf("Child process started\n");
 		
-		int file_size = 512;
-		sleep(1);
-
+		int file_size = 32;
+		//for(int file_size = 32; file_size <= 2*1024*1024; file_size *= 2)
+		{
 		stringkey key = "key";
-		int init_key = 0;
+		int init_key = 1;
 		err = bpf_map__update_elem(skel->maps.execve_counter, &key, sizeof(key), &init_key, sizeof(init_key),  BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Failed to save key %d\n", err);
-			goto cleanup;
-		}
-
-		stringkey bring_page_key = "bring_page";
-		int bring_page = 0;
-		err = bpf_map__update_elem(skel->maps.execve_counter, &bring_page_key, sizeof(bring_page_key), &bring_page, sizeof(bring_page),  BPF_ANY);
 		if (err != 0) {
 			fprintf(stderr, "Failed to save key %d\n", err);
 			goto cleanup;
@@ -115,8 +107,16 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
+		stringkey bring_page_key = "bring_page";
+		int bring_page = 0;
+		err = bpf_map__update_elem(skel->maps.execve_counter, &bring_page_key, sizeof(bring_page_key), &bring_page, sizeof(bring_page),  BPF_ANY);
+		if (err != 0) {
+			fprintf(stderr, "Failed to save key %d\n", err);
+			goto cleanup;
+		}
+
 		char fioCommand[100];
-		sprintf(fioCommand, "FILESIZE=%dk BLOCK_SIZE=%dk READSIZE=%dK fio readfile.fio", fs, bs, rs);
+		sprintf(fioCommand, "FILESIZE=%dK BLOCK_SIZE=%dk READSIZE=%dK fio readfile.fio", fs, bs, rs);
 
 		// Execute the FIO command
 		result = system(fioCommand);
@@ -147,19 +147,14 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
-		for (int i=0; i < key_size; i++) {
+		for (i=0; i < key_size; i++) {
 			stringinput message;
 			err = bpf_map__lookup_elem(skel->maps.log_file, &i, sizeof(i), message, sizeof(message), BPF_ANY);
 			fprintf(file, "%s\n", message);
 		}
 
 		fclose(file);
-		
-		result = system("cat log.txt | grep add");
-		if (result == -1)
-		{
-			printf("error: cat log.txt\n");
-			goto cleanup;
+		system("cat log.txt | grep add");
 		}
 	}
 	else {
