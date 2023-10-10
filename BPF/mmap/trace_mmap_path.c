@@ -55,7 +55,6 @@ int main(int argc, char **argv)
 	printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
 			"to see output of the BPF programs.\n");
 
-	int file_size = 20;
 	pid_t child_pid = fork();
 
 	if (child_pid == -1) {
@@ -66,28 +65,11 @@ int main(int argc, char **argv)
 	if( child_pid == 0)
 	{
 		sleep(1);
+
+		int file_size = 1000;
 		int bs = 4; //bs stands for block size
 		int fs = file_size; //fs stands for file size
 		int rs = fs; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
-
-		char fioCommand[100];
-		sprintf(fioCommand, "run_fio.sh");
-		//execl("./", fioCommand, NULL);
-		int error = execl("/home/simos/libbpf-bootstrap/examples/c/", "ls", NULL);
-
-		perror("Exec failed");
-		exit(EXIT_FAILURE);
-	}
-	else
-	{
-
-		stringkey pid_key = "pid";
-		int pid = child_pid;
-		err = bpf_map__update_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key), &pid, sizeof(pid),  BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Failed to save key %d\n", err);
-			goto cleanup;
-		}
 
 		stringkey key = "key";
 		int init_key = 0;
@@ -104,7 +86,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Failed to save key %d\n", err);
 			goto cleanup;
 		}
-		
+
 		int i = 0, nr_pages = file_size / 4;
 
 		err = bpf_map__update_elem(skel->maps.index_map, &i, sizeof(i), &nr_pages, sizeof(nr_pages), BPF_ANY);
@@ -131,12 +113,16 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
-		int status;
-        	waitpid(child_pid, &status, 0);
+		char fioCommand[100];
+		sprintf(fioCommand, "FILESIZE=%dk BLOCK_SIZE=%dk READSIZE=%dK fio readfile.fio", fs, bs, rs);
 
-        	if (WIFEXITED(status)) {
-            		printf("Child process exited with status: %d\n", WEXITSTATUS(status));
-        	}
+		// Execute the FIO command
+		result = system(fioCommand);
+
+		if (result == -1) {
+			printf("Failed to execute FIO command.\n");
+			goto cleanup;
+		}
 
 		//Delete test file created by fio (it creates future hazzards)
 		result = system("rm test");
@@ -146,14 +132,34 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
+		int key_size;
+		err = bpf_map__lookup_elem(skel->maps.execve_counter, &key, sizeof(key),  &key_size, sizeof(key_size), BPF_ANY);
+		if (err != 0) {
+			fprintf(stderr, "Failed to retreive key_size, err= %d\n", err);
+			goto cleanup;
+		}
+
+		FILE* file = fopen("log.txt", "w");
+		if (file == NULL) {
+			printf("Failed to open the file.\n");
+			goto cleanup;
+		}
+
+		for (int i=0; i < key_size; i++) {
+			stringinput message;
+			err = bpf_map__lookup_elem(skel->maps.log_file, &i, sizeof(i), message, sizeof(message), BPF_ANY);
+			fprintf(file, "%s\n", message);
+		}
+
+		fclose(file);
+
 		/*const char* file_path = "output.txt";
 		  int file_descriptor;
-		  char buffer[BUFFER_SIZE];
 
 		// Open the file
 		file_descriptor = open(file_path, O_RDONLY);
 		if (file_descriptor == -1) {
-		fprintf(stderr, "Failed to open the file");
+		fprintf(stderr, "Failed to open the file\n");
 		goto cleanup;
 		}
 
@@ -177,26 +183,18 @@ int main(int argc, char **argv)
 		munmap(addr, st.st_size);
 		*/
 
-		int key_size;
-		err = bpf_map__lookup_elem(skel->maps.execve_counter, &key, sizeof(key),  &key_size, sizeof(key_size), BPF_ANY);
-		if (err != 0) {
-			fprintf(stderr, "Failed to retreive key_size, err= %d\n", err);
-			goto cleanup;
+	}
+	else
+	{
+		printf("child Process ID: %d\n", child_pid);
+
+		int status;
+		waitpid(child_pid, &status, 0);
+
+		if (WIFEXITED(status)) {
+			printf("Child process exited with status: %d\n", WEXITSTATUS(status));
 		}
 
-		FILE* file = fopen("log.txt", "w");
-		if (file == NULL) {
-			printf("Failed to open the file.\n");
-			goto cleanup;
-		}
-
-		for (int i=0; i < key_size; i++) {
-			stringinput message;
-			err = bpf_map__lookup_elem(skel->maps.log_file, &i, sizeof(i), message, sizeof(message), BPF_ANY);
-			fprintf(file, "%s\n", message);
-		}
-
-		fclose(file);
 
 		sleep(1);
 	}
