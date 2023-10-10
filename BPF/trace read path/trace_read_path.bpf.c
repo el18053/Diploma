@@ -86,20 +86,94 @@ int trace_pread64(struct pt_regs *ctx) {
 SEC("kretsyscall/pread64")
 
 int trace_ret_pread64(struct pt_regs *ctx) {
+	u32 uid = bpf_get_current_pid_tgid();
 
-	if ( get_access(bpf_get_current_pid_tgid()) )
+	if ( get_access(uid) )
 	{
 		bpf_printk("ksys_pread64 exited\n");
 
-		stringinput message;
 		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "ksys_pread64 exited\n");
+		stringinput message = "";
+		BPF_SNPRINTF(message, sizeof(message), "ksys_pread64 exited from process with pid:%d\n", uid);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 
 		stringkey pid_key = "pid";
 		bpf_map_delete_elem(&execve_counter, &pid_key);
 
+	}
 
+	return 0;
+}
+
+/*SEC("kprobe/vfs_read")
+
+int trace_pread64(struct pt_regs *ctx) {
+	stringkey pid_key = "pid";
+	u32 uid;
+	uid = bpf_get_current_pid_tgid();
+
+	u32 *v;
+	v = bpf_map_lookup_elem(&execve_counter, &pid_key);
+	if (v == NULL) {
+		
+		struct file *f = (struct file *)PT_REGS_PARM1(ctx);
+		struct file **filp = &f;
+		char *filename = "test";
+
+		int ret = bpf_get_filename(filename, sizeof(filename), filp);
+
+		if(ret == 1)
+		{
+			bpf_printk("vfs_read started from process with pid:%d", uid);
+		
+			int key = get_key();
+			stringinput message = "";
+			BPF_SNPRINTF(message, sizeof(message), "vfs_read started from process with pid:%d", uid);
+			bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
+
+			v = &uid;
+			bpf_map_update_elem(&execve_counter, &pid_key, v, BPF_ANY);
+		}
+	}
+
+	return 0;
+
+}
+
+SEC("kretprobe/vfs_read")
+
+int trace_ret_pread64(struct pt_regs *ctx) {
+	u32 uid = bpf_get_current_pid_tgid();
+
+	if ( get_access(uid) )
+	{
+		bpf_printk("vfs_read exited\n");
+
+		int key = get_key();
+		stringinput message = "";
+		BPF_SNPRINTF(message, sizeof(message), "vfs_read exited from process with pid:%d\n", uid);
+		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
+
+		stringkey pid_key = "pid";
+		bpf_map_delete_elem(&execve_counter, &pid_key);
+
+	}
+
+	return 0;
+}*/
+
+SEC("kprobe/generic_file_read_iter")
+
+int trace_generic_file_read_iter(struct pt_regs *ctx) {
+
+	if ( get_access(bpf_get_current_pid_tgid()) )
+	{
+		bpf_printk("generic_file_read_iter started");
+
+		stringinput message;	
+		int key = get_key();
+		bpf_probe_read_str(message, sizeof(message), "generic_file_read_iter started");
+		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
 	return 0;
@@ -107,7 +181,7 @@ int trace_ret_pread64(struct pt_regs *ctx) {
 
 SEC("kprobe/filemap_read")
 
-int trace_filemap_read(void *ctx) {
+int trace_filemap_read(struct pt_regs *ctx) {
 
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
@@ -136,19 +210,27 @@ int trace_filemap_get_pages(struct pt_regs *ctx) {
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 		
 		struct kiocb *iocb = (struct kiocb *)PT_REGS_PARM1(ctx);
-
+		struct file **filp = &iocb->ki_filp;
+		
 		//struct kiocb iocb;
 		//bpf_probe_read(&iocb, sizeof(struct kiocb), (void*)PT_REGS_PARM1(ctx));
 		
 		stringkey bring_page_key = "bring_page";
-		int *bring_pages = bpf_map_lookup_elem(&execve_counter, &bring_page_key);
-		if (bring_pages != NULL)
+		int *bring_page = bpf_map_lookup_elem(&execve_counter, &bring_page_key);
+		if (bring_page != NULL)
 		{
-			if (*bring_pages == 0)
+			if (*bring_page == 0)
 			{
-				*bring_pages = 1;
-				bpf_simos(iocb, &index_map);
+				char *filename = "test";
+				
+				int ret = bpf_get_filename(filename, sizeof(filename), filp);
+				if(ret == 1)
+				{
+					*bring_page = 1;
+					bpf_simos(filp, &index_map);
+				}
 			}
+
 		}	
 	}	
 
@@ -210,15 +292,6 @@ int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
 		//time to bring some pages of our own
 		struct readahead_control ractl;
 		bpf_probe_read(&ractl, sizeof(struct readahead_control), (void *)PT_REGS_PARM1(ctx));
-		/*if(bring_pages == 0)
-		{
-			int nr_pages = 10;
-			stringkey indexes_key = "indexes";
-			int *indexes = bpf_map_lookup_elem(&index_map, &indexes_key);
-			if(indexes != NULL)
-				bpf_simos(&ractl, nr_pages - 1, indexes);
-			bring_pages += 1;
-		}*/
 	}
 
 	return 0;
@@ -312,7 +385,7 @@ int trace_ondemand_readahead_enter(struct pt_regs *ctx) {
 		BPF_SNPRINTF(message, sizeof(message), "ondemand_readahead started with req_size=%d, hit_readahead_marker=%d", req_size, (int)hit_readahead_marker);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 
-		struct readahead_control ractl;
+		/*struct readahead_control ractl;
 
 		// Use bpf_probe_read() to read the necessary data structures from kernel memory
 		bpf_probe_read(&ractl, sizeof(struct readahead_control), (void *)PT_REGS_PARM1(ctx));
@@ -330,29 +403,9 @@ int trace_ondemand_readahead_enter(struct pt_regs *ctx) {
 		bpf_printk("ra->ra_pages Maximum size of a readahead request : %d", ra.ra_pages);
 		bpf_printk("ra->mmap_misses How many mmap accesses missed in the page cache : %d", ra.mmap_miss);
 		bpf_printk("ra->prev_pos The last byte in the most recent read request : %d\n", ra.prev_pos);
-
+		*/
 	}
 
-	return 0;
-}
-
-SEC("kprobe/my_custom_function_2")
-
-int trace_my_custom_function(struct pt_regs *ctx) {
-	//if ( get_access(bpf_get_current_pid_tgid()) )
-	//{
-		bpf_printk("\n ***my_custom_function started***\n");
-	//}
-	return 0;
-}
-
-SEC("kretprobe/my_custom_function_2")
-
-int trace_return_my_custom_function(struct pt_regs *ctx) {
-	if ( get_access(bpf_get_current_pid_tgid()) )
-	{
-		bpf_printk("\n ***my_custom_function finished***\n");
-	}
 	return 0;
 }
 
@@ -478,23 +531,6 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 
 	return 0;
 }
-
-SEC("kprobe/__add_to_page_cache_locked")
-
-int trace_add_to_page_cache_lru(struct pt_regs *ctx) {
-	if( get_access(bpf_get_current_pid_tgid()) )
-	{
-		bpf_printk("__add_to_page_cache_lru");
-		/*if( something == 0)
-		  {
-		  bpf_override_return(ctx, -1);
-		  something += 1;
-		  }*/
-	}
-	return 0;
-
-}
-
 
 SEC("kretprobe/copy_page_to_iter")
 
