@@ -44,21 +44,6 @@ int get_access(u32 process_pid)
 	return 0;
 }
 
-/*int get_access(stringkey comm)
-{
-	if (comm != NULL)
-	{
-		if(comm[0] == 102 && comm[1] == 105 && comm[2] == 111)
-		{
-			return 1;
-		}
-		
-		return 0;
-	}
-
-	return 0;
-}*/
-
 int get_key() {
 	stringkey key = "key";
 	int *key_val = bpf_map_lookup_elem(&execve_counter, &key);
@@ -72,36 +57,67 @@ int get_key() {
 
 SEC("kprobe/filemap_fault")
 
-int trace_filemap_fault(struct pt_regs *ctx) {
-	stringkey comm;
-	bpf_get_current_comm(&comm, sizeof(comm));
-	
-	if ( get_access(bpf_get_current_pid_tgid()) )
+int trace_filemap_fault(struct pt_regs *ctx) 
+{
+	stringkey pid_key = "pid";
+	u32 *saved_pid = bpf_map_lookup_elem(&execve_counter, &pid_key);
+
+	if (saved_pid == NULL)
 	{
-
-		bpf_printk("filemap_fault started");
-
-		stringinput message;
-		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "filemap_fault started");
-		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
-		
 		struct vm_fault vmf;// = (struct vm_fault *)PT_REGS_PARM1(ctx);
 		bpf_probe_read(&vmf, sizeof(struct vm_fault), (struct vm_fault *)PT_REGS_PARM1(ctx));
 		struct vm_area_struct *vma = vmf.vma;
 		struct file **filp = &vma->vm_file;
-		
-		stringkey bring_page_key = "bring_page";
-		int *bring_pages = bpf_map_lookup_elem(&execve_counter, &bring_page_key);
-		if (bring_pages != NULL)
+
+		char *filename = "test";
+		int ret = bpf_get_filename(filename, sizeof(filename), filp);
+
+		if(ret == 1)
 		{
-			if (*bring_pages == 0)
+			u32 uid = bpf_get_current_pid_tgid();
+			saved_pid = &uid;
+			bpf_map_update_elem(&execve_counter, &pid_key, saved_pid, BPF_ANY);
+
+			stringkey bring_page_key = "bring_page";
+			int *bring_pages = bpf_map_lookup_elem(&execve_counter, &bring_page_key);
+			if (bring_pages != NULL)
 			{
-				*bring_pages = 1;
-				bpf_simos(filp, &index_map);
-			}
-		}	
+				if (*bring_pages == 0)
+				{
+					*bring_pages = 1;
+					bpf_simos(filp, &index_map);
+				}
+			}	
+
+			bpf_printk("filemap_fault started");
+
+			stringinput message;
+			int key = get_key();
+			bpf_probe_read_str(message, sizeof(message), "filemap_fault started");
+			bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
+		}
+
 	}	
+
+	return 0;
+}
+
+SEC("kretprobe/filemap_fault")
+
+int trace_filemap_fault_exit(struct pt_regs *ctx) 
+{
+	if ( get_access(bpf_get_current_pid_tgid()) )
+	{
+		stringkey pid_key = "pid";	
+		bpf_map_delete_elem(&execve_counter, &pid_key);
+
+		bpf_printk("filemap_fault exited");
+
+		stringinput message;
+		int key = get_key();
+		bpf_probe_read_str(message, sizeof(message), "filemap_fault exited");
+		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
+	}
 
 	return 0;
 }
@@ -111,7 +127,7 @@ SEC("kprobe/pagecache_get_page")
 int trace_pagecache_get_page(struct pt_regs *ctx) {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		bpf_printk("pagecache_get_page started");
@@ -130,7 +146,7 @@ SEC("kretprobe/pagecache_get_page")
 int trace_ret_pagecache_get_page(struct pt_regs *ctx) {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		bpf_printk("pagecache_get_page exited");
@@ -150,7 +166,7 @@ int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
 {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		//page_cache_sync_ra started!
@@ -173,7 +189,7 @@ int trace_page_cache_sync_ra_exit(struct pt_regs *ctx)
 {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		//page_cache_sync_ra exits!
@@ -194,7 +210,7 @@ int trace_page_cache_async_ra_enter(struct pt_regs *ctx)
 {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		//page_cache_async_ra started!
@@ -217,7 +233,7 @@ int trace_page_cache_async_ra_exit(struct pt_regs *ctx)
 {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		//page_cache_async_ra exits!
@@ -238,7 +254,7 @@ int trace_do_page_cache_ra(struct pt_regs *ctx)
 {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		int req_size = PT_REGS_PARM2(ctx);
@@ -260,7 +276,7 @@ int trace_page_cache_ra_unbounded(struct pt_regs *ctx)
 {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		int nr_to_read = PT_REGS_PARM2(ctx);
@@ -283,7 +299,7 @@ int trace_page_cache_ra_unbounded_exit(struct pt_regs *ctx)
 {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		bpf_printk("page_cache_ra_unbounded exited");
@@ -303,7 +319,7 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 {
 	stringkey comm;
 	bpf_get_current_comm(&comm, sizeof(comm));
-	
+
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		int offset = PT_REGS_PARM3(ctx);
