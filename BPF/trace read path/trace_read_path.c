@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 		//child process
 		printf("Child process started\n");
 		
-		int file_size = 32;
+		int file_size = 20;
 		//for(int file_size = 32; file_size <= 2*1024*1024; file_size *= 2)
 		{
 		stringkey key = "key";
@@ -108,15 +108,16 @@ int main(int argc, char **argv)
 		}
 
 		stringkey bring_page_key = "bring_page";
-		int bring_page = 0;
+		int bring_page = 1;
 		err = bpf_map__update_elem(skel->maps.execve_counter, &bring_page_key, sizeof(bring_page_key), &bring_page, sizeof(bring_page),  BPF_ANY);
 		if (err != 0) {
 			fprintf(stderr, "Failed to save key %d\n", err);
 			goto cleanup;
 		}
 
+		char *engine = "psync";
 		char fioCommand[100];
-		sprintf(fioCommand, "FILESIZE=%dK BLOCK_SIZE=%dk READSIZE=%dK fio readfile.fio", fs, bs, rs);
+		sprintf(fioCommand, "FILESIZE=%dk BLOCK_SIZE=%dk ENGINE=%s READSIZE=%dk fio readfile.fio", fs, bs, engine, rs);
 
 		// Execute the FIO command
 		result = system(fioCommand);
@@ -154,7 +155,6 @@ int main(int argc, char **argv)
 		}
 
 		fclose(file);
-		system("cat log.txt | grep add");
 		}
 	}
 	else {
