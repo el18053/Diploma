@@ -219,14 +219,14 @@ int trace_filemap_get_pages(struct pt_regs *ctx) {
 		int *bring_page = bpf_map_lookup_elem(&execve_counter, &bring_page_key);
 		if (bring_page != NULL)
 		{
-			if (*bring_page == 0)
+			if (*bring_page == 1)
 			{
 				char *filename = "test";
 				
 				int ret = bpf_get_filename(filename, sizeof(filename), filp);
 				if(ret == 1)
 				{
-					*bring_page = 1;
+					*bring_page = 0;
 					bpf_simos(filp, &index_map);
 				}
 			}
