@@ -1,0 +1,14 @@
+[global]
+name=test
+filename=test
+rw=read
+bs=${BLOCK_SIZE}
+direct=0
+runtime=900
+size=${FILESIZE}
+ioengine=${ENGINE}
+numjobs=1
+fadvise_hint=0
+
+[file]
+io_size=${READSIZE}
