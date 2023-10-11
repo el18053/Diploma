@@ -64,12 +64,12 @@ int main(int argc, char **argv)
 		//child process
 		printf("Child process started\n");
 
-		for(int file_size = 2*1024*1024; file_size <= 2*1024*1024; file_size *= 4)
+		for(int file_size = 32; file_size <= 32; file_size *= 4)
 		{
 			sleep(1);
 
-			stringkey bring_page_key = "bring_page";
 			int bring_page = 1;
+			stringkey bring_page_key = "bring_page";
 			err = bpf_map__update_elem(skel->maps.pid_map, &bring_page_key, sizeof(bring_page_key), &bring_page, sizeof(bring_page), BPF_ANY);
 			if (err != 0) {
 				fprintf(stderr, "Failed to set bring_page = 0 (error code=%d)", err);
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 
 			int bs = 4; //bs stands for block size
 			int fs = file_size; //fs stands for file size
-			int rs = fs; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
+			int rs = fs / 2; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
 
 			//Empty Cache
 			int result = system("echo 1 > /proc/sys/vm/drop_caches");
@@ -105,9 +105,10 @@ int main(int argc, char **argv)
 				printf("Failed to empty cache.\n");
 				goto cleanup;
 			}
-
+			
+			char *engine = "psync";
 			char fioCommand[100];
-			sprintf(fioCommand, "FILESIZE=%dk BLOCK_SIZE=%dk READSIZE=%dK fio readfile.fio", fs, bs, rs);
+			sprintf(fioCommand, "FILESIZE=%dk BLOCK_SIZE=%dk ENGINE=%s READSIZE=%dK fio readfile.fio", fs, bs, engine, rs);
 
 			// Execute the FIO command
 			result = system(fioCommand);
