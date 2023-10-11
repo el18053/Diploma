@@ -82,9 +82,9 @@ int trace_filemap_fault(struct pt_regs *ctx)
 			int *bring_pages = bpf_map_lookup_elem(&execve_counter, &bring_page_key);
 			if (bring_pages != NULL)
 			{
-				if (*bring_pages == 0)
+				if (*bring_pages == 1)
 				{
-					*bring_pages = 1;
+					*bring_pages = 0;
 					bpf_simos(filp, &index_map);
 				}
 			}	
