@@ -6,7 +6,7 @@ bs=${BLOCK_SIZE}
 direct=0
 runtime=900
 size=${FILESIZE}
-ioengine=psync
+ioengine=${ENGINE}
 numjobs=1
 fadvise_hint=0
 
