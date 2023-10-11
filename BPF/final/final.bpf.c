@@ -40,16 +40,15 @@ int get_access(u32 process_pid)
 
 SEC("ksyscall/pread64")
 
-int trace_pread64(struct pt_regs *ctx) {
-	
-	u32 *v;
+int trace_pread64(struct pt_regs *ctx) 
+{
 	stringkey pid_key = "pid";
-	v = bpf_map_lookup_elem(&pid_map, &pid_key);
-	if (v == NULL) 
-	{
-		u32 uid;
-		uid = bpf_get_current_pid_tgid();
+	u32 uid;
+	uid = bpf_get_current_pid_tgid();
 
+	u32 *v;
+	v = bpf_map_lookup_elem(&pid_map, &pid_key);
+	if (v == NULL) {
 		v = &uid;
 		bpf_map_update_elem(&pid_map, &pid_key, v, BPF_ANY);
 	}
@@ -60,16 +59,20 @@ int trace_pread64(struct pt_regs *ctx) {
 
 SEC("kretsyscall/pread64")
 
-int trace_ret_pread64(struct pt_regs *ctx) {
+int trace_ret_pread64(struct pt_regs *ctx) 
+{
 
 	if ( get_access(bpf_get_current_pid_tgid()) )
 	{
 		stringkey pid_key = "pid";
 		bpf_map_delete_elem(&pid_map, &pid_key);
+
+
 	}
 
 	return 0;
 }
+
 
 SEC("kprobe/filemap_get_pages")
 
@@ -82,11 +85,18 @@ int trace_filemap_get_pages(struct pt_regs *ctx) {
 		
 		if (bring_page != NULL)
 		{
-			if (*bring_page == 0)
+			if (*bring_page == 1)
 			{
-				*bring_page = 1;
 				struct kiocb *iocb = (struct kiocb *)PT_REGS_PARM1(ctx);
-				bpf_simos(iocb, &index_map);
+				struct file **filp = &iocb->ki_filp;
+				char *filename = "test";
+				
+				int ret = bpf_get_filename(filename, sizeof(filename), filp);
+				if(ret == 1)
+				{
+					*bring_page = 0;
+					bpf_simos(filp, &index_map);
+				}
 			}
 		}
 	}
