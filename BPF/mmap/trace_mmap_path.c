@@ -10,8 +10,6 @@
 #include <bpf/libbpf.h>
 #include "trace_mmap_path.skel.h"
 
-#define BUFFER_SIZE 4096
-
 typedef __u64 u64;
 typedef __u32 u32;
 typedef char stringkey[64];
@@ -153,37 +151,6 @@ int main(int argc, char **argv)
 		}
 
 		fclose(file);
-
-		/*const char* file_path = "output.txt";
-		  int file_descriptor;
-
-		// Open the file
-		file_descriptor = open(file_path, O_RDONLY);
-		if (file_descriptor == -1) {
-		fprintf(stderr, "Failed to open the file\n");
-		goto cleanup;
-		}
-
-		//mmap the file
-		struct stat st;
-		fstat(file_descriptor, &st); //obtain file size
-
-		void *addr = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, file_descriptor, 0);
-		if (addr == MAP_FAILED) {
-		printf("mmap failed \n");
-		goto cleanup;
-		}
-
-		char* file_data = (char*)addr;
-
-		for (ssize_t i=0; i < st.st_size; i++) {
-		char letter = file_data[i];
-		}
-
-		// Don't forget to unmap the file after you're done
-		munmap(addr, st.st_size);
-		*/
-
 	}
 	else
 	{
