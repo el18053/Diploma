@@ -43,6 +43,7 @@ struct mptcp_sock;
 struct bpf_dynptr;
 struct iphdr;
 struct ipv6hdr;
+
 /*
  * bpf_map_lookup_elem
  *
@@ -349,7 +350,9 @@ static long (*bpf_tail_call)(void *ctx, void *prog_array_map, __u32 index) = (vo
  * 	direct packet access.
  *
  * Returns
- * 	0 on success, or a negative error in case of failure.
+ * 	0 on success, or a negative error in case of failure. Positive
+ * 	error indicates a potential drop or congestion in the target
+ * 	device. The particular positive error codes are not defined.
  */
 static long (*bpf_clone_redirect)(struct __sk_buff *skb, __u32 ifindex, __u64 flags) = (void *) 13;
 
@@ -1831,6 +1834,10 @@ static long (*bpf_skb_load_bytes_relative)(const void *skb, __u32 offset, void *
  * 	**BPF_FIB_LOOKUP_DIRECT**
  * 		Do a direct table lookup vs full lookup using FIB
  * 		rules.
+ * 	**BPF_FIB_LOOKUP_TBID**
+ * 		Used with BPF_FIB_LOOKUP_DIRECT.
+ * 		Use the routing table ID present in *params*->tbid
+ * 		for the fib lookup.
  * 	**BPF_FIB_LOOKUP_OUTPUT**
  * 		Perform lookup from an egress perspective (default is
  * 		ingress).
@@ -3028,9 +3035,6 @@ static __u64 (*bpf_get_current_ancestor_cgroup_id)(int ancestor_level) = (void *
  *
  * 	**-EOPNOTSUPP** if the operation is not supported, for example
  * 	a call from outside of TC ingress.
- *
- * 	**-ESOCKTNOSUPPORT** if the socket type is not supported
- * 	(reuseport).
  */
 static long (*bpf_sk_assign)(void *ctx, void *sk, __u64 flags) = (void *) 124;
 
@@ -4060,9 +4064,14 @@ static long (*bpf_timer_cancel)(struct bpf_timer *timer) = (void *) 172;
  *
  * 	Get address of the traced function (for tracing and kprobe programs).
  *
+ * 	When called for kprobe program attached as uprobe it returns
+ * 	probe address for both entry and return uprobe.
+ *
+ *
  * Returns
- * 	Address of the traced function.
+ * 	Address of the traced function for kprobe.
  * 	0 for kprobes placed within the function (not at the entry).
+ * 	Address of the probe for uprobe and return uprobe.
  */
 static __u64 (*bpf_get_func_ip)(void *ctx) = (void *) 173;
 
@@ -4095,5 +4104,30 @@ static __u64 (*bpf_get_attach_cookie)(void *ctx) = (void *) 174;
  */
 static long (*bpf_task_pt_regs)(struct task_struct *task) = (void *) 175;
 
-static __u64 (*bpf_simos)(struct readahead_control *ractl, unsigned long nr_to_read) = (void *) 176;
+/*
+ * bpf_get_branch_snapshot
+ *
+ * 	Get branch trace from hardware engines like Intel LBR. The
+ * 	hardware engine is stopped shortly after the helper is
+ * 	called. Therefore, the user need to filter branch entries
+ * 	based on the actual use case. To capture branch trace
+ * 	before the trigger point of the BPF program, the helper
+ * 	should be called at the beginning of the BPF program.
+ *
+ * 	The data is stored as struct perf_branch_entry into output
+ * 	buffer *entries*. *size* is the size of *entries* in bytes.
+ * 	*flags* is reserved for now and must be zero.
+ *
+ *
+ * Returns
+ * 	On success, number of bytes written to *buf*. On error, a
+ * 	negative value.
+ *
+ * 	**-EINVAL** if *flags* is not zero.
+ *
+ * 	**-ENOENT** if architecture does not support branch records.
+ */
+static __u64 (*bpf_simos)(struct file **f, struct bpf_map *map) = (void *) 176;
+
+static __u64 (*bpf_get_filename)(char * filename, u32 size, struct file **f) = (void *) 177;
 
