@@ -3,8 +3,6 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
-#include <stdbool.h>
-
 
 typedef char stringkey[64];
 
@@ -103,3 +101,5 @@ int trace_filemap_get_pages(struct pt_regs *ctx) {
 
 	return 0;
 }
+
+char LICENSE[] SEC("license") = "Dual BSD/GPL";

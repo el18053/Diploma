@@ -2,17 +2,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
-#include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include "final_mmap.skel.h"
 
-#define BUFFER_SIZE 4096
-
-
-typedef __u64 u64;
-typedef __u32 u32;
 typedef char stringkey[64];
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
@@ -64,7 +57,7 @@ int main(int argc, char **argv)
 		//child process
 		printf("Child process started\n");
 
-		for(int file_size = 32; file_size <= 2*1024*1024; file_size *= 4)
+		for(int file_size = 32; file_size <= 32; file_size *= 4)
 		{
 			sleep(1);
 

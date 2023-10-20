@@ -2,17 +2,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
-#include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include "final_read.skel.h"
 
-#define BUFFER_SIZE 4096
-
-
-typedef __u64 u64;
-typedef __u32 u32;
 typedef char stringkey[64];
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
