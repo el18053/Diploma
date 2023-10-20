@@ -26,11 +26,12 @@
 
 #include "internal.h"
 
+
 /*
  * Initialise a struct file's readahead state.  Assumes that the caller has
  * memset *ra to zero.
  */
-void
+	void
 file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
 {
 	ra->ra_pages = inode_to_bdi(mapping->host)->ra_pages;
@@ -46,7 +47,7 @@ EXPORT_SYMBOL_GPL(file_ra_state_init);
  *   an error
  */
 static void read_cache_pages_invalidate_page(struct address_space *mapping,
-					     struct page *page)
+		struct page *page)
 {
 	if (page_has_private(page)) {
 		if (!trylock_page(page))
@@ -63,7 +64,7 @@ static void read_cache_pages_invalidate_page(struct address_space *mapping,
  * release a list of pages, invalidating them first if need be
  */
 static void read_cache_pages_invalidate_pages(struct address_space *mapping,
-					      struct list_head *pages)
+		struct list_head *pages)
 {
 	struct page *victim;
 
@@ -87,7 +88,7 @@ static void read_cache_pages_invalidate_pages(struct address_space *mapping,
  * Returns: %0 on success, error return by @filler otherwise
  */
 int read_cache_pages(struct address_space *mapping, struct list_head *pages,
-			int (*filler)(void *, struct page *), void *data)
+		int (*filler)(void *, struct page *), void *data)
 {
 	struct page *page;
 	int ret = 0;
@@ -96,7 +97,7 @@ int read_cache_pages(struct address_space *mapping, struct list_head *pages,
 		page = lru_to_page(pages);
 		list_del(&page->lru);
 		if (add_to_page_cache_lru(page, mapping, page->index,
-				readahead_gfp_mask(mapping))) {
+					readahead_gfp_mask(mapping))) {
 			read_cache_pages_invalidate_page(mapping, page);
 			continue;
 		}
@@ -193,6 +194,7 @@ void page_cache_ra_unbounded(struct readahead_control *ractl,
 	unsigned int nofs = memalloc_nofs_save();
 
 	filemap_invalidate_lock_shared(mapping);
+
 	/*
 	 * Preallocate as many pages as we will need.
 	 */
@@ -219,7 +221,7 @@ void page_cache_ra_unbounded(struct readahead_control *ractl,
 		if (mapping->a_ops->readpages) {
 			page->index = index + i;
 			list_add(&page->lru, &page_pool);
-		} else if (add_to_page_cache_lru(page, mapping, index + i,
+		} else if (add_to_page_cache_lru(page, mapping, index + i, 
 					gfp_mask) < 0) {
 			put_page(page);
 			read_pages(ractl, &page_pool, true);
@@ -251,6 +253,7 @@ EXPORT_SYMBOL_GPL(page_cache_ra_unbounded);
 void do_page_cache_ra(struct readahead_control *ractl,
 		unsigned long nr_to_read, unsigned long lookahead_size)
 {
+	//printk(KERN_DEBUG "(Process:%s,PID:%d)->do_page_cache_ra started\n");
 	struct inode *inode = ractl->mapping->host;
 	unsigned long index = readahead_index(ractl);
 	loff_t isize = i_size_read(inode);
@@ -276,13 +279,14 @@ void do_page_cache_ra(struct readahead_control *ractl,
 void force_page_cache_ra(struct readahead_control *ractl,
 		unsigned long nr_to_read)
 {
+	//printk(KERN_DEBUG "(Process:%s,PID:%d)->force_page_cache_ra started\n");
 	struct address_space *mapping = ractl->mapping;
 	struct file_ra_state *ra = ractl->ra;
 	struct backing_dev_info *bdi = inode_to_bdi(mapping->host);
 	unsigned long max_pages, index;
 
 	if (unlikely(!mapping->a_ops->readpage && !mapping->a_ops->readpages &&
-			!mapping->a_ops->readahead))
+				!mapping->a_ops->readahead))
 		return;
 
 	/*
@@ -330,7 +334,7 @@ static unsigned long get_init_ra_size(unsigned long size, unsigned long max)
  *  return it as the new window size.
  */
 static unsigned long get_next_ra_size(struct file_ra_state *ra,
-				      unsigned long max)
+		unsigned long max)
 {
 	unsigned long cur = ra->size;
 
@@ -387,7 +391,7 @@ static unsigned long get_next_ra_size(struct file_ra_state *ra,
  * 	- thrashing threshold in memory tight systems
  */
 static pgoff_t count_history_pages(struct address_space *mapping,
-				   pgoff_t index, unsigned long max)
+		pgoff_t index, unsigned long max)
 {
 	pgoff_t head;
 
@@ -402,10 +406,10 @@ static pgoff_t count_history_pages(struct address_space *mapping,
  * page cache context based read-ahead
  */
 static int try_context_readahead(struct address_space *mapping,
-				 struct file_ra_state *ra,
-				 pgoff_t index,
-				 unsigned long req_size,
-				 unsigned long max)
+		struct file_ra_state *ra,
+		pgoff_t index,
+		unsigned long req_size,
+		unsigned long max)
 {
 	pgoff_t size;
 
@@ -432,12 +436,66 @@ static int try_context_readahead(struct address_space *mapping,
 	return 1;
 }
 
+void my_custom_function_2(struct readahead_control *ractl, unsigned long nr_to_read, int *indexes)
+{
+	//printk(KERN_DEBUG "my_custom_func just started");
+	if(indexes == NULL) {
+		printk(KERN_DEBUG "my_custom_func indexes == NULL return...");
+		return ;
+	}
+	if(ractl == NULL) {
+		printk(KERN_DEBUG "my_custom_func ractl == NULL return...");
+		return ;
+	}	
+
+
+	struct inode *inode = ractl->mapping->host;
+	unsigned long index, prev_index, i, j, seq_pages_to_read;
+	loff_t isize = i_size_read(inode);
+	pgoff_t end_index;	/* The last page we want to read */
+	if (isize == 0)
+		return;
+
+	end_index = (isize - 1) >> PAGE_SHIFT;
+	
+	for(i=0; i<nr_to_read; i++)
+	{
+		seq_pages_to_read = 0;
+		index = indexes[i];
+		ractl->_index = index;
+		if (index > end_index)
+			return ;
+		seq_pages_to_read += 1;
+		for(j = i + 1; j < nr_to_read; j++)
+		{
+			prev_index = index;
+			index = indexes[j];
+			if (index > end_index)
+				return page_cache_ra_unbounded(ractl, seq_pages_to_read, 0);
+			if (index != prev_index + 1)
+				break;
+			seq_pages_to_read += 1;
+			/* Don't read past the page containing the last byte of the file */
+			if (seq_pages_to_read > end_index - ractl->_index)
+			{
+				//printk(KERN_DEBUG "my_custom_func_2 ended in end_index - ractl->_index < seq_read");
+				seq_pages_to_read = end_index - ractl->_index + 1;
+				return page_cache_ra_unbounded(ractl, seq_pages_to_read, 0);
+			}
+		}
+		i = i + seq_pages_to_read - 1;
+		page_cache_ra_unbounded(ractl, seq_pages_to_read, 0);
+	}
+
+	
+}
+
 /*
  * A minimal readahead algorithm for trivial sequential/random reads.
  */
-static void ondemand_readahead(struct readahead_control *ractl,
-		bool hit_readahead_marker, unsigned long req_size)
+static void ondemand_readahead(struct readahead_control *ractl, bool hit_readahead_marker, unsigned long req_size)
 {
+	//printk(KERN_DEBUG "(Process:%s,PID:%d)->ondemand_readahead started\n", current->comm, current->pid);
 	struct backing_dev_info *bdi = inode_to_bdi(ractl->mapping->host);
 	struct file_ra_state *ra = ractl->ra;
 	unsigned long max_pages = ra->ra_pages;
@@ -463,7 +521,7 @@ static void ondemand_readahead(struct readahead_control *ractl,
 	 * Ramp up sizes, and push forward the readahead window.
 	 */
 	if ((index == (ra->start + ra->size - ra->async_size) ||
-	     index == (ra->start + ra->size))) {
+				index == (ra->start + ra->size))) {
 		ra->start += ra->size;
 		ra->size = get_next_ra_size(ra, max_pages);
 		ra->async_size = ra->size;
@@ -515,7 +573,7 @@ static void ondemand_readahead(struct readahead_control *ractl,
 	 * that a sequential stream would leave behind.
 	 */
 	if (try_context_readahead(ractl->mapping, ra, index, req_size,
-			max_pages))
+				max_pages))
 		goto readit;
 
 	/*
@@ -555,6 +613,7 @@ readit:
 void page_cache_sync_ra(struct readahead_control *ractl,
 		unsigned long req_count)
 {
+	//printk(KERN_DEBUG "(Process:%s,PID:%d)->page_cache_sync_ra started\n", current->comm, current->pid);
 	bool do_forced_ra = ractl->file && (ractl->file->f_mode & FMODE_RANDOM);
 
 	/*
@@ -584,6 +643,7 @@ EXPORT_SYMBOL_GPL(page_cache_sync_ra);
 void page_cache_async_ra(struct readahead_control *ractl,
 		struct page *page, unsigned long req_count)
 {
+	//printk(KERN_DEBUG "(Process:%s,PID:%d)->page_cache_async_ra started\n", current->comm, current->pid);
 	/* no read-ahead */
 	if (!ractl->ra->ra_pages)
 		return;
@@ -627,7 +687,7 @@ ssize_t ksys_readahead(int fd, loff_t offset, size_t count)
 	 */
 	ret = -EINVAL;
 	if (!f.file->f_mapping || !f.file->f_mapping->a_ops ||
-	    !S_ISREG(file_inode(f.file)->i_mode))
+			!S_ISREG(file_inode(f.file)->i_mode))
 		goto out;
 
 	ret = vfs_fadvise(f.file, offset, count, POSIX_FADV_WILLNEED);
@@ -660,7 +720,7 @@ SYSCALL_DEFINE3(readahead, int, fd, loff_t, offset, size_t, count)
  * different expansion than was requested.
  */
 void readahead_expand(struct readahead_control *ractl,
-		      loff_t new_start, size_t new_len)
+		loff_t new_start, size_t new_len)
 {
 	struct address_space *mapping = ractl->mapping;
 	struct file_ra_state *ra = ractl->ra;
