@@ -861,6 +861,9 @@ void page_cache_async_ra(struct readahead_control *, struct page *,
 void readahead_expand(struct readahead_control *ractl,
 		      loff_t new_start, size_t new_len);
 
+void my_custom_function(struct readahead_control *ractl, unsigned long req_size, int indexes[]);
+void my_custom_function_2(struct readahead_control *ractl, unsigned long nr_to_read, int indexes[]);
+
 /**
  * page_cache_sync_readahead - generic file readahead
  * @mapping: address_space which holds the pagecache and I/O vectors
@@ -880,6 +883,7 @@ void page_cache_sync_readahead(struct address_space *mapping,
 		unsigned long req_count)
 {
 	DEFINE_READAHEAD(ractl, file, ra, mapping, index);
+	//printk(KERN_DEBUG "(Process:%s,PID:%d)->page_cache_sync_readahead started (cache miss)\n", current->comm, current->pid);
 	page_cache_sync_ra(&ractl, req_count);
 }
 
@@ -903,6 +907,7 @@ void page_cache_async_readahead(struct address_space *mapping,
 		struct page *page, pgoff_t index, unsigned long req_count)
 {
 	DEFINE_READAHEAD(ractl, file, ra, mapping, index);
+	//printk(KERN_DEBUG "(Process:%s,PID:%d)->page_cache_async_readahead started (marked as PageReadahead)\n", current->comm, current->pid);
 	page_cache_async_ra(&ractl, page, req_count);
 }
 
