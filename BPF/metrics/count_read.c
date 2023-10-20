@@ -2,17 +2,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
-#include <sys/resource.h>
 #include <bpf/libbpf.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
-#include "count.skel.h"
+#include "count_read.skel.h"
 
-#define BUFFER_SIZE 4096
-
-typedef __u64 u64;
 typedef __u32 u32;
 typedef char stringkey[64];
 
@@ -24,7 +18,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 int main(int argc, char **argv)
 {
-	struct count_bpf *skel;
+	struct count_read_bpf *skel;
 	int err;
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
@@ -32,21 +26,21 @@ int main(int argc, char **argv)
 	libbpf_set_print(libbpf_print_fn);
 
 	/* Open BPF application */
-	skel = count_bpf__open();
+	skel = count_read_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "Failed to open BPF skeleton\n");
 		return 1;
 	}
 
 	/* Load & verify BPF programs */
-	err = count_bpf__load(skel);
+	err = count_read_bpf__load(skel);
 	if (err) {
 		fprintf(stderr, "Failed to load and verify BPF skeleton\n");
 		goto cleanup;
 	}
 
 	/* Attach tracepoint handler */
-	err = count_bpf__attach(skel);
+	err = count_read_bpf__attach(skel);
 	if (err) {
 		fprintf(stderr, "Failed to attach BPF skeleton\n");
 		goto cleanup;
@@ -74,7 +68,7 @@ int main(int argc, char **argv)
 		stringkey access_key_2 = "async_accessed";
 		u32 v;
 
-		for(int i=1024; i<=1024; i*=2)
+		for(int file_size=32; file_size<=32; file_size*=4)
 		{
 			v = 0;
 			err = bpf_map__update_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &v, sizeof(v),  BPF_ANY);
@@ -97,60 +91,11 @@ int main(int argc, char **argv)
 				goto cleanup;
 			}
 
-			/*
-			// Create file to read
-			char command[100];
-			sprintf(command, "python3 create_file.py %d", i);
-
-			int result = system(command);
-
-			if (result == -1) {
-				printf("Failed to create file.\n");
-				goto cleanup;
-			}
-
-			//Empty Cache
-			result = system("echo 1 > /proc/sys/vm/drop_caches");
-
-			if (result == -1) {
-				printf("Failed to empty cache.\n");
-				goto cleanup;
-			}
-
-			// trigger our BPF program 
-
-			const char *file_path = "output.txt";
-			int fd;
-			char buffer[BUFFER_SIZE];
-			ssize_t bytes_read, offset = 0;
-
-
-			// Open the file
-			fd = open(file_path, O_RDONLY);
-
-			if (fd == -1) {
-				perror("Failed to open the file");
-				exit(1);
-			}
-			
-			// Read the file sequentially
-			offset = 0;
-			while ((bytes_read = pread(fd, buffer, BUFFER_SIZE, offset)) > 0) {
-				offset += bytes_read;
-			}
-			//pread(fd, buffer, BUFFER_SIZE, offset);
-
-			// Don't forget to unmap the file after you're done
-			//munmap(addr, st.st_size);
-			
-			// Close the file
-			close(fd);
-			*/
-
 			int bs = 4; //bs stands for block size
-			int fs = 128; //fs stands for file size
-			int rs = 64; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
-
+			int fs = file_size; //fs stands for file size
+			int rs = fs; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
+			char *engine = "psync";
+			
 			//Empty Cache
 			int result = system("echo 1 > /proc/sys/vm/drop_caches");
 
@@ -161,7 +106,7 @@ int main(int argc, char **argv)
 
 
 			char fioCommand[100];
-			sprintf(fioCommand, "FILESIZE=%dk BLOCK_SIZE=%dk READSIZE=%dK fio readfile.fio", fs, bs, rs);
+			sprintf(fioCommand, "FILESIZE=%dk BLOCK_SIZE=%dk ENGINE=%s READSIZE=%dK fio readfile.fio", fs, bs, engine, rs);
 
 			// Execute the FIO command
 			result = system(fioCommand);
@@ -200,41 +145,16 @@ int main(int argc, char **argv)
 				goto cleanup;
 			}
 
-			printf("FILE SIZE = %d KBytes\n", i);
+			printf("FILE SIZE = %d KBytes\n", file_size);
 			printf("Number of page(s) copied to user : %d\n", copy_page);
 			printf("Number of Sync fetcted page(s) : %d\n", sync_accesses);
 			printf("Number of Async fetched page(s) : %d\n", async_accesses);
-			/*double ratio = 0;
-			  ratio = ((double)copy_page - sync_accesses) / copy_page;
-			  printf("Cache Hit Ratio(%%) : %f\n", ratio*100);
-			  ratio = 1 - ratio;
-			  printf("Cache Miss Ratio(%%) : %f\n", ratio*100);
-			  ratio = (async_accesses + sync_accesses) > 0 ? (double)async_accesses / (double)(async_accesses + sync_accesses) : 0;
-			  printf("Cache Prefetching Ratio(%%) : %f\n", ratio*100);
-			  */
 			printf("###############################################################\n");
 		}
-		//After Read is completed delete the pid of the process. (You don't want to counter accesses anymore !)
-		/*stringkey pid_key = "pid";
-		  err = bpf_map__delete_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key),  BPF_ANY);
-		  if (err != 0) {
-		  fprintf(stderr, "Failed to delete the (key,pid) of the process with pid, %d\n", err);
-		  goto cleanup;
-		  }*/
-
 	}
 	else {
 		//parent process
 		printf("Parent process created Child process with PID: %d\n", pid);
-
-		//Pid of the process that will execute the read sys call
-		/*stringkey pid_key = "pid";
-		  u32 v = pid;
-		  err = bpf_map__update_elem(skel->maps.execve_counter, &pid_key, sizeof(pid_key), &v, sizeof(v),  BPF_ANY);
-		  if (err != 0) {
-		  fprintf(stderr, "Failed to init the process pid, %d\n", err);
-		  goto cleanup;
-		  }*/
 
 		//wait for child process to execute read commmand
 		int status;
@@ -248,6 +168,6 @@ int main(int argc, char **argv)
 	sleep(1);
 
 cleanup:
-	count_bpf__destroy(skel);
+	count_read_bpf__destroy(skel);
 	return -err;
 }

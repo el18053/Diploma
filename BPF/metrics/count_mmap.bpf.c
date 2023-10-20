@@ -1,10 +1,7 @@
-#include <linux/bpf.h>
+#include "vmlinux.h"
+
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
-#include <linux/ptrace.h>
-#include <linux/types.h>
-#include <stddef.h>
-#include <stdbool.h>
 
 typedef __u32 u32;
 typedef __u64 u64;
@@ -33,38 +30,46 @@ int get_access(u32 process_pid)
         return 0;
 }
 
-SEC("ksyscall/pread64")
+SEC("kprobe/filemap_fault")
 
-int trace_pread64(struct pt_regs *ctx) {
-        stringkey pid_key = "pid";
-        u32 uid;
-        uid = bpf_get_current_pid_tgid();
+int trace_filemap_fault(struct pt_regs *ctx) 
+{
+	stringkey pid_key = "pid";
+	u32 *saved_pid = bpf_map_lookup_elem(&execve_counter, &pid_key);
 
-        u32 *v;
-        v = bpf_map_lookup_elem(&execve_counter, &pid_key);
-        if (v == NULL) {
-                //bpf_printk("ksys_pread64 started from process with pid:%d", uid);
-                v = &uid;
-                bpf_map_update_elem(&execve_counter, &pid_key, v, BPF_ANY);
+	if (saved_pid == NULL)
+	{
+		struct vm_fault vmf;// = (struct vm_fault *)PT_REGS_PARM1(ctx);
+		bpf_probe_read(&vmf, sizeof(struct vm_fault), (struct vm_fault *)PT_REGS_PARM1(ctx));
+		struct vm_area_struct *vma = vmf.vma;
+		struct file **filp = &vma->vm_file;
 
-        }
+		char *filename = "test";
+		int ret = bpf_get_filename(filename, sizeof(filename), filp);
 
-        return 0;
+		if(ret == 1)
+		{
+			u32 uid = bpf_get_current_pid_tgid();
+			saved_pid = &uid;
+			bpf_map_update_elem(&execve_counter, &pid_key, saved_pid, BPF_ANY);
+		}
 
+	}	
+
+	return 0;
 }
 
-SEC("kretsyscall/pread64")
+SEC("kretprobe/filemap_fault")
 
-int trace_ret_pread64(struct pt_regs *ctx) {
+int trace_filemap_fault_exit(struct pt_regs *ctx) 
+{
+	if ( get_access(bpf_get_current_pid_tgid()) )
+	{
+		stringkey pid_key = "pid";	
+		bpf_map_delete_elem(&execve_counter, &pid_key);
+	}
 
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //bpf_printk("ksys_pread64 exited\n");
-                stringkey pid_key = "pid";
-                bpf_map_delete_elem(&execve_counter, &pid_key);
-        }
-
-        return 0;
+	return 0;
 }
 
 SEC("kprobe/page_cache_sync_ra")
@@ -185,26 +190,6 @@ int trace_page_cache_lru(struct pt_regs *ctx)
                         }
                 }
 
-        }
-
-        return 0;
-}
-
-SEC("kretprobe/copy_page_to_iter")
-
-int trace_copy_page_to_iter(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //bpf_printk("copy_page_to_iter started");
-
-                stringkey new_key = "copy_page_to_iter";
-                u32 *v = NULL;
-                v = bpf_map_lookup_elem(&execve_counter, &new_key);
-                if (v != NULL) {
-                        if ( PT_REGS_RC(ctx) )
-                                *v += 1;
-                }
         }
 
         return 0;
