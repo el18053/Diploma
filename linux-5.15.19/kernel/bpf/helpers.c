@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2011-2014 PLUMgrid, http://plumgrid.com
- */
+*/
 #include <linux/bpf.h>
 #include <linux/rcupdate.h>
 #include <linux/random.h>
@@ -18,6 +18,7 @@
 
 #include "../../lib/kstrtox.h"
 
+#include <linux/pagemap.h>
 /* If kernel subsystem is allowing eBPF programs to call this function,
  * inside its own verifier_ops->get_func_proto() callback it should return
  * bpf_map_lookup_elem_proto, so that verifier can properly check the arguments
@@ -27,6 +28,7 @@
  * if program is allowed to access maps, so check rcu_read_lock_held in
  * all three functions.
  */
+
 BPF_CALL_2(bpf_map_lookup_elem, struct bpf_map *, map, void *, key)
 {
 	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
@@ -43,7 +45,7 @@ const struct bpf_func_proto bpf_map_lookup_elem_proto = {
 };
 
 BPF_CALL_4(bpf_map_update_elem, struct bpf_map *, map, void *, key,
-	   void *, value, u64, flags)
+		void *, value, u64, flags)
 {
 	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
 	return map->ops->map_update_elem(map, key, value, flags);
@@ -206,7 +208,7 @@ BPF_CALL_0(bpf_get_current_uid_gid)
 
 	current_uid_gid(&uid, &gid);
 	return (u64) from_kgid(&init_user_ns, gid) << 32 |
-		     from_kuid(&init_user_ns, uid);
+		from_kuid(&init_user_ns, uid);
 }
 
 const struct bpf_func_proto bpf_get_current_uid_gid_proto = {
@@ -242,6 +244,80 @@ const struct bpf_func_proto bpf_get_current_comm_proto = {
 	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
 	.arg2_type	= ARG_CONST_SIZE,
 };
+
+BPF_CALL_3(bpf_get_filename, char *, filename, u32, size, struct file **, f)
+{
+	//printk(KERN_DEBUG "bpf_get_filename started\n");
+	
+	if (unlikely(!f))
+		goto err_clear;
+
+	struct file *filp = *f;
+	/* First attempt to find filename */
+	struct path *f_path = &filp->f_path;
+	struct dentry *dentry = f_path->dentry;
+	const struct qstr *dname = &dentry->d_name;
+	//printk(KERN_DEBUG "Filename is %s\n", dname->name);
+	/*	end	*/
+	
+	int ret = strncmp(filename, dname->name, size);
+	if(ret != 0)
+		return 0;
+	return 1;
+err_clear:
+	return 0;
+}
+
+const struct bpf_func_proto bpf_get_filename_proto = {
+	.func		= bpf_get_filename,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_ANYTHING,
+	.arg2_type	= ARG_ANYTHING,
+	.arg3_type	= ARG_ANYTHING,
+};
+
+BPF_CALL_2(bpf_simos, struct file **, f, struct bpf_map *, map)
+{
+	printk(KERN_DEBUG "bpf_simos started\n");
+
+	unsigned long i = 0;
+
+	WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
+	unsigned long *nr_pages = (unsigned long) map->ops->map_lookup_elem(map, &i);
+	int *indexes = kzalloc(*nr_pages*sizeof(int), GFP_ATOMIC);//int indexes[*nr_pages];
+	if (nr_pages != NULL)
+	{
+		for(i=1; i <= *nr_pages; i++)
+		{
+			WARN_ON_ONCE(!rcu_read_lock_held() && !rcu_read_lock_bh_held());
+			unsigned long *index = (unsigned long) map->ops->map_lookup_elem(map, &i);
+			indexes[i-1] = *index;
+		}
+
+	}
+
+	struct file *filp = *f;
+	struct address_space *mapping = filp->f_mapping;
+	struct file_ra_state *ra = &filp->f_ra;
+	
+	DEFINE_READAHEAD(ractl, filp, ra, mapping, 0);
+	
+	my_custom_function_2(&ractl, *nr_pages, indexes);
+	
+	kfree(indexes);
+	
+	return 0;
+}
+
+const struct bpf_func_proto bpf_simos_proto = {
+	.func		= bpf_simos,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_ANYTHING,
+	.arg2_type	= ARG_ANYTHING,
+};
+
 
 #if defined(CONFIG_QUEUED_SPINLOCKS) || defined(CONFIG_BPF_ARCH_SPINLOCK)
 
@@ -334,7 +410,7 @@ const struct bpf_func_proto bpf_spin_unlock_proto = {
 };
 
 void copy_map_value_locked(struct bpf_map *map, void *dst, void *src,
-			   bool lock_src)
+		bool lock_src)
 {
 	struct bpf_spin_lock *lock;
 
@@ -439,7 +515,7 @@ const struct bpf_func_proto bpf_get_local_storage_proto = {
 #define BPF_STRTOX_BASE_MASK 0x1F
 
 static int __bpf_strtoull(const char *buf, size_t buf_len, u64 flags,
-			  unsigned long long *res, bool *is_negative)
+		unsigned long long *res, bool *is_negative)
 {
 	unsigned int base = flags & BPF_STRTOX_BASE_MASK;
 	const char *cur_buf = buf;
@@ -490,7 +566,7 @@ static int __bpf_strtoull(const char *buf, size_t buf_len, u64 flags,
 }
 
 static int __bpf_strtoll(const char *buf, size_t buf_len, u64 flags,
-			 long long *res)
+		long long *res)
 {
 	unsigned long long _res;
 	bool is_negative;
@@ -512,7 +588,7 @@ static int __bpf_strtoll(const char *buf, size_t buf_len, u64 flags,
 }
 
 BPF_CALL_4(bpf_strtol, const char *, buf, size_t, buf_len, u64, flags,
-	   long *, res)
+		long *, res)
 {
 	long long _res;
 	int err;
@@ -537,7 +613,7 @@ const struct bpf_func_proto bpf_strtol_proto = {
 };
 
 BPF_CALL_4(bpf_strtoul, const char *, buf, size_t, buf_len, u64, flags,
-	   unsigned long *, res)
+		unsigned long *, res)
 {
 	unsigned long long _res;
 	bool is_negative;
@@ -566,7 +642,7 @@ const struct bpf_func_proto bpf_strtoul_proto = {
 #endif
 
 BPF_CALL_4(bpf_get_ns_current_pid_tgid, u64, dev, u64, ino,
-	   struct bpf_pidns_info *, nsdata, u32, size)
+		struct bpf_pidns_info *, nsdata, u32, size)
 {
 	struct task_struct *task = current;
 	struct pid_namespace *pidns;
@@ -615,7 +691,7 @@ static const struct bpf_func_proto bpf_get_raw_smp_processor_id_proto = {
 };
 
 BPF_CALL_5(bpf_event_output_data, void *, ctx, struct bpf_map *, map,
-	   u64, flags, void *, data, u64, size)
+		u64, flags, void *, data, u64, size)
 {
 	if (unlikely(flags & ~(BPF_F_INDEX_MASK)))
 		return -EINVAL;
@@ -635,7 +711,7 @@ const struct bpf_func_proto bpf_event_output_data_proto =  {
 };
 
 BPF_CALL_3(bpf_copy_from_user, void *, dst, u32, size,
-	   const void __user *, user_ptr)
+		const void __user *, user_ptr)
 {
 	int ret = copy_from_user(dst, user_ptr, size);
 
@@ -692,16 +768,16 @@ static int bpf_trace_copy_string(char *buf, void *unsafe_ptr, char fmt_ptype,
 	buf[0] = 0;
 
 	switch (fmt_ptype) {
-	case 's':
+		case 's':
 #ifdef CONFIG_ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE
-		if ((unsigned long)unsafe_ptr < TASK_SIZE)
-			return strncpy_from_user_nofault(buf, user_ptr, bufsz);
-		fallthrough;
+			if ((unsigned long)unsafe_ptr < TASK_SIZE)
+				return strncpy_from_user_nofault(buf, user_ptr, bufsz);
+			fallthrough;
 #endif
-	case 'k':
-		return strncpy_from_kernel_nofault(buf, unsafe_ptr, bufsz);
-	case 'u':
-		return strncpy_from_user_nofault(buf, user_ptr, bufsz);
+		case 'k':
+			return strncpy_from_kernel_nofault(buf, unsafe_ptr, bufsz);
+		case 'u':
+			return strncpy_from_user_nofault(buf, user_ptr, bufsz);
 	}
 
 	return -EINVAL;
@@ -761,7 +837,7 @@ void bpf_bprintf_cleanup(void)
  * allocated and bpf_bprintf_cleanup should be called to free them after use.
  */
 int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
-			u32 **bin_args, u32 num_args)
+		u32 **bin_args, u32 num_args)
 {
 	char *unsafe_ptr = NULL, *tmp_buf = NULL, *tmp_buf_end, *fmt_end;
 	size_t sizeof_cur_arg, sizeof_cur_ip;
@@ -808,7 +884,7 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 
 		/* skip optional "[0 +-][num]" width formatting field */
 		while (fmt[i] == '0' || fmt[i] == '+'  || fmt[i] == '-' ||
-		       fmt[i] == ' ')
+				fmt[i] == ' ')
 			i++;
 		if (fmt[i] >= '1' && fmt[i] <= '9') {
 			i++;
@@ -820,16 +896,16 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 			sizeof_cur_arg = sizeof(long);
 
 			if ((fmt[i + 1] == 'k' || fmt[i + 1] == 'u') &&
-			    fmt[i + 2] == 's') {
+					fmt[i + 2] == 's') {
 				fmt_ptype = fmt[i + 1];
 				i += 2;
 				goto fmt_str;
 			}
 
 			if (fmt[i + 1] == 0 || isspace(fmt[i + 1]) ||
-			    ispunct(fmt[i + 1]) || fmt[i + 1] == 'K' ||
-			    fmt[i + 1] == 'x' || fmt[i + 1] == 's' ||
-			    fmt[i + 1] == 'S') {
+					ispunct(fmt[i + 1]) || fmt[i + 1] == 'K' ||
+					fmt[i + 1] == 'x' || fmt[i + 1] == 's' ||
+					fmt[i + 1] == 'S') {
 				/* just kernel pointers */
 				if (tmp_buf)
 					cur_arg = raw_args[num_spec];
@@ -840,9 +916,9 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 			if (fmt[i + 1] == 'B') {
 				if (tmp_buf)  {
 					err = snprintf(tmp_buf,
-						       (tmp_buf_end - tmp_buf),
-						       "%pB",
-						       (void *)(long)raw_args[num_spec]);
+							(tmp_buf_end - tmp_buf),
+							"%pB",
+							(void *)(long)raw_args[num_spec]);
 					tmp_buf += (err + 1);
 				}
 
@@ -853,7 +929,7 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 
 			/* only support "%pI4", "%pi4", "%pI6" and "%pi6". */
 			if ((fmt[i + 1] != 'i' && fmt[i + 1] != 'I') ||
-			    (fmt[i + 2] != '4' && fmt[i + 2] != '6')) {
+					(fmt[i + 2] != '4' && fmt[i + 2] != '6')) {
 				err = -EINVAL;
 				goto out;
 			}
@@ -870,7 +946,7 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 
 			unsafe_ptr = (char *)(long)raw_args[num_spec];
 			err = copy_from_kernel_nofault(cur_ip, unsafe_ptr,
-						       sizeof_cur_ip);
+					sizeof_cur_ip);
 			if (err < 0)
 				memset(cur_ip, 0, sizeof_cur_ip);
 
@@ -881,7 +957,7 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 			ip_spec[2] = fmt[i - 1];
 			ip_spec[3] = fmt[i];
 			err = snprintf(tmp_buf, tmp_buf_end - tmp_buf,
-				       ip_spec, &cur_ip);
+					ip_spec, &cur_ip);
 
 			tmp_buf += err + 1;
 			num_spec++;
@@ -891,8 +967,8 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 			fmt_ptype = fmt[i];
 fmt_str:
 			if (fmt[i + 1] != 0 &&
-			    !isspace(fmt[i + 1]) &&
-			    !ispunct(fmt[i + 1])) {
+					!isspace(fmt[i + 1]) &&
+					!ispunct(fmt[i + 1])) {
 				err = -EINVAL;
 				goto out;
 			}
@@ -907,8 +983,8 @@ fmt_str:
 
 			unsafe_ptr = (char *)(long)raw_args[num_spec];
 			err = bpf_trace_copy_string(tmp_buf, unsafe_ptr,
-						    fmt_ptype,
-						    tmp_buf_end - tmp_buf);
+					fmt_ptype,
+					tmp_buf_end - tmp_buf);
 			if (err < 0) {
 				tmp_buf[0] = '\0';
 				err = 1;
@@ -946,7 +1022,7 @@ fmt_str:
 		}
 
 		if (fmt[i] != 'i' && fmt[i] != 'd' && fmt[i] != 'u' &&
-		    fmt[i] != 'x' && fmt[i] != 'X') {
+				fmt[i] != 'x' && fmt[i] != 'X') {
 			err = -EINVAL;
 			goto out;
 		}
@@ -982,13 +1058,13 @@ out:
 #define MAX_SNPRINTF_VARARGS		12
 
 BPF_CALL_5(bpf_snprintf, char *, str, u32, str_size, char *, fmt,
-	   const void *, data, u32, data_len)
+		const void *, data, u32, data_len)
 {
 	int err, num_args;
 	u32 *bin_args;
 
 	if (data_len % 8 || data_len > MAX_SNPRINTF_VARARGS * 8 ||
-	    (data_len && !data))
+			(data_len && !data))
 		return -EINVAL;
 	num_args = data_len / 8;
 
@@ -1084,7 +1160,7 @@ static enum hrtimer_restart bpf_timer_cb(struct hrtimer *hrtimer)
 	}
 
 	BPF_CAST_CALL(callback_fn)((u64)(long)map, (u64)(long)key,
-				   (u64)(long)value, 0, 0);
+			(u64)(long)value, 0, 0);
 	/* The verifier checked that return value is zero. */
 
 	this_cpu_write(hrtimer_running, NULL);
@@ -1093,7 +1169,7 @@ out:
 }
 
 BPF_CALL_3(bpf_timer_init, struct bpf_timer_kern *, timer, struct bpf_map *, map,
-	   u64, flags)
+		u64, flags)
 {
 	clockid_t clockid = flags & (MAX_CLOCKS - 1);
 	struct bpf_hrtimer *t;
@@ -1107,10 +1183,10 @@ BPF_CALL_3(bpf_timer_init, struct bpf_timer_kern *, timer, struct bpf_map *, map
 		return -EOPNOTSUPP;
 
 	if (flags >= MAX_CLOCKS ||
-	    /* similar to timerfd except _ALARM variants are not supported */
-	    (clockid != CLOCK_MONOTONIC &&
-	     clockid != CLOCK_REALTIME &&
-	     clockid != CLOCK_BOOTTIME))
+			/* similar to timerfd except _ALARM variants are not supported */
+			(clockid != CLOCK_MONOTONIC &&
+			 clockid != CLOCK_REALTIME &&
+			 clockid != CLOCK_BOOTTIME))
 		return -EINVAL;
 	__bpf_spin_lock_irqsave(&timer->lock);
 	t = timer->timer;
@@ -1153,7 +1229,7 @@ static const struct bpf_func_proto bpf_timer_init_proto = {
 };
 
 BPF_CALL_3(bpf_timer_set_callback, struct bpf_timer_kern *, timer, void *, callback_fn,
-	   struct bpf_prog_aux *, aux)
+		struct bpf_prog_aux *, aux)
 {
 	struct bpf_prog *prev, *prog = aux->prog;
 	struct bpf_hrtimer *t;
@@ -1339,103 +1415,107 @@ const struct bpf_func_proto bpf_probe_read_kernel_proto __weak;
 const struct bpf_func_proto bpf_probe_read_kernel_str_proto __weak;
 const struct bpf_func_proto bpf_task_pt_regs_proto __weak;
 
-const struct bpf_func_proto *
+	const struct bpf_func_proto *
 bpf_base_func_proto(enum bpf_func_id func_id)
 {
 	switch (func_id) {
-	case BPF_FUNC_map_lookup_elem:
-		return &bpf_map_lookup_elem_proto;
-	case BPF_FUNC_map_update_elem:
-		return &bpf_map_update_elem_proto;
-	case BPF_FUNC_map_delete_elem:
-		return &bpf_map_delete_elem_proto;
-	case BPF_FUNC_map_push_elem:
-		return &bpf_map_push_elem_proto;
-	case BPF_FUNC_map_pop_elem:
-		return &bpf_map_pop_elem_proto;
-	case BPF_FUNC_map_peek_elem:
-		return &bpf_map_peek_elem_proto;
-	case BPF_FUNC_get_prandom_u32:
-		return &bpf_get_prandom_u32_proto;
-	case BPF_FUNC_get_smp_processor_id:
-		return &bpf_get_raw_smp_processor_id_proto;
-	case BPF_FUNC_get_numa_node_id:
-		return &bpf_get_numa_node_id_proto;
-	case BPF_FUNC_tail_call:
-		return &bpf_tail_call_proto;
-	case BPF_FUNC_ktime_get_ns:
-		return &bpf_ktime_get_ns_proto;
-	case BPF_FUNC_ktime_get_boot_ns:
-		return &bpf_ktime_get_boot_ns_proto;
-	case BPF_FUNC_ringbuf_output:
-		return &bpf_ringbuf_output_proto;
-	case BPF_FUNC_ringbuf_reserve:
-		return &bpf_ringbuf_reserve_proto;
-	case BPF_FUNC_ringbuf_submit:
-		return &bpf_ringbuf_submit_proto;
-	case BPF_FUNC_ringbuf_discard:
-		return &bpf_ringbuf_discard_proto;
-	case BPF_FUNC_ringbuf_query:
-		return &bpf_ringbuf_query_proto;
-	case BPF_FUNC_for_each_map_elem:
-		return &bpf_for_each_map_elem_proto;
-	default:
-		break;
+		case BPF_FUNC_map_lookup_elem:
+			return &bpf_map_lookup_elem_proto;
+		case BPF_FUNC_map_update_elem:
+			return &bpf_map_update_elem_proto;
+		case BPF_FUNC_map_delete_elem:
+			return &bpf_map_delete_elem_proto;
+		case BPF_FUNC_map_push_elem:
+			return &bpf_map_push_elem_proto;
+		case BPF_FUNC_map_pop_elem:
+			return &bpf_map_pop_elem_proto;
+		case BPF_FUNC_map_peek_elem:
+			return &bpf_map_peek_elem_proto;
+		case BPF_FUNC_get_prandom_u32:
+			return &bpf_get_prandom_u32_proto;
+		case BPF_FUNC_get_smp_processor_id:
+			return &bpf_get_raw_smp_processor_id_proto;
+		case BPF_FUNC_get_numa_node_id:
+			return &bpf_get_numa_node_id_proto;
+		case BPF_FUNC_tail_call:
+			return &bpf_tail_call_proto;
+		case BPF_FUNC_ktime_get_ns:
+			return &bpf_ktime_get_ns_proto;
+		case BPF_FUNC_ktime_get_boot_ns:
+			return &bpf_ktime_get_boot_ns_proto;
+		case BPF_FUNC_ringbuf_output:
+			return &bpf_ringbuf_output_proto;
+		case BPF_FUNC_ringbuf_reserve:
+			return &bpf_ringbuf_reserve_proto;
+		case BPF_FUNC_ringbuf_submit:
+			return &bpf_ringbuf_submit_proto;
+		case BPF_FUNC_ringbuf_discard:
+			return &bpf_ringbuf_discard_proto;
+		case BPF_FUNC_ringbuf_query:
+			return &bpf_ringbuf_query_proto;
+		case BPF_FUNC_for_each_map_elem:
+			return &bpf_for_each_map_elem_proto;
+		case BPF_FUNC_simos:
+			return &bpf_simos_proto;
+		case BPF_FUNC_get_filename:
+			return &bpf_get_filename_proto;
+		default:
+			break;
 	}
 
 	if (!bpf_capable())
 		return NULL;
 
 	switch (func_id) {
-	case BPF_FUNC_spin_lock:
-		return &bpf_spin_lock_proto;
-	case BPF_FUNC_spin_unlock:
-		return &bpf_spin_unlock_proto;
-	case BPF_FUNC_jiffies64:
-		return &bpf_jiffies64_proto;
-	case BPF_FUNC_per_cpu_ptr:
-		return &bpf_per_cpu_ptr_proto;
-	case BPF_FUNC_this_cpu_ptr:
-		return &bpf_this_cpu_ptr_proto;
-	case BPF_FUNC_timer_init:
-		return &bpf_timer_init_proto;
-	case BPF_FUNC_timer_set_callback:
-		return &bpf_timer_set_callback_proto;
-	case BPF_FUNC_timer_start:
-		return &bpf_timer_start_proto;
-	case BPF_FUNC_timer_cancel:
-		return &bpf_timer_cancel_proto;
-	default:
-		break;
+		case BPF_FUNC_spin_lock:
+			return &bpf_spin_lock_proto;
+		case BPF_FUNC_spin_unlock:
+			return &bpf_spin_unlock_proto;
+		case BPF_FUNC_jiffies64:
+			return &bpf_jiffies64_proto;
+		case BPF_FUNC_per_cpu_ptr:
+			return &bpf_per_cpu_ptr_proto;
+		case BPF_FUNC_this_cpu_ptr:
+			return &bpf_this_cpu_ptr_proto;
+		case BPF_FUNC_timer_init:
+			return &bpf_timer_init_proto;
+		case BPF_FUNC_timer_set_callback:
+			return &bpf_timer_set_callback_proto;
+		case BPF_FUNC_timer_start:
+			return &bpf_timer_start_proto;
+		case BPF_FUNC_timer_cancel:
+			return &bpf_timer_cancel_proto;
+		default:
+			break;
 	}
 
 	if (!perfmon_capable())
 		return NULL;
 
 	switch (func_id) {
-	case BPF_FUNC_trace_printk:
-		return bpf_get_trace_printk_proto();
-	case BPF_FUNC_get_current_task:
-		return &bpf_get_current_task_proto;
-	case BPF_FUNC_get_current_task_btf:
-		return &bpf_get_current_task_btf_proto;
-	case BPF_FUNC_probe_read_user:
-		return &bpf_probe_read_user_proto;
-	case BPF_FUNC_probe_read_kernel:
-		return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
-		       NULL : &bpf_probe_read_kernel_proto;
-	case BPF_FUNC_probe_read_user_str:
-		return &bpf_probe_read_user_str_proto;
-	case BPF_FUNC_probe_read_kernel_str:
-		return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
-		       NULL : &bpf_probe_read_kernel_str_proto;
-	case BPF_FUNC_snprintf_btf:
-		return &bpf_snprintf_btf_proto;
-	case BPF_FUNC_snprintf:
-		return &bpf_snprintf_proto;
-	case BPF_FUNC_task_pt_regs:
-		return &bpf_task_pt_regs_proto;
-	default:
-		return NULL;
+		case BPF_FUNC_trace_printk:
+			return bpf_get_trace_printk_proto();
+		case BPF_FUNC_get_current_task:
+			return &bpf_get_current_task_proto;
+		case BPF_FUNC_get_current_task_btf:
+			return &bpf_get_current_task_btf_proto;
+		case BPF_FUNC_probe_read_user:
+			return &bpf_probe_read_user_proto;
+		case BPF_FUNC_probe_read_kernel:
+			return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
+				NULL : &bpf_probe_read_kernel_proto;
+		case BPF_FUNC_probe_read_user_str:
+			return &bpf_probe_read_user_str_proto;
+		case BPF_FUNC_probe_read_kernel_str:
+			return security_locked_down(LOCKDOWN_BPF_READ_KERNEL) < 0 ?
+				NULL : &bpf_probe_read_kernel_str_proto;
+		case BPF_FUNC_snprintf_btf:
+			return &bpf_snprintf_btf_proto;
+		case BPF_FUNC_snprintf:
+			return &bpf_snprintf_proto;
+		case BPF_FUNC_task_pt_regs:
+			return &bpf_task_pt_regs_proto;
+		default:
+			return NULL;
 	}
 }
