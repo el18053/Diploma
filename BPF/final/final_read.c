@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <bpf/libbpf.h>
-#include "final.skel.h"
+#include "final_read.skel.h"
 
 #define BUFFER_SIZE 4096
 
@@ -22,7 +22,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 int main(int argc, char **argv)
 {
-	struct final_bpf *skel;
+	struct final_read_bpf *skel;
 	int err;
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
@@ -30,21 +30,21 @@ int main(int argc, char **argv)
 	libbpf_set_print(libbpf_print_fn);
 
 	/* Open BPF application */
-	skel = final_bpf__open();
+	skel = final_read_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "Failed to open BPF skeleton\n");
 		return 1;
 	}   
 
 	/* Load & verify BPF programs */
-	err = final_bpf__load(skel);
+	err = final_read_bpf__load(skel);
 	if (err) {
 		fprintf(stderr, "Failed to load and verify BPF skeleton\n");
 		goto cleanup;
 	}
 
 	/* Attach tracepoint handler */
-	err = final_bpf__attach(skel);
+	err = final_read_bpf__attach(skel);
 	if (err) {
 		fprintf(stderr, "Failed to attach BPF skeleton\n");
 		goto cleanup;
@@ -64,7 +64,8 @@ int main(int argc, char **argv)
 		//child process
 		printf("Child process started\n");
 
-		for(int file_size = 32; file_size <= 32; file_size *= 4)
+		//for(int file_size = 32; file_size <= 2*1024*1024; file_size *= 4)
+		int file_size = 32;
 		{
 			sleep(1);
 
@@ -96,7 +97,7 @@ int main(int argc, char **argv)
 
 			int bs = 4; //bs stands for block size
 			int fs = file_size; //fs stands for file size
-			int rs = fs / 2; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
+			int rs = fs; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
 
 			//Empty Cache
 			int result = system("echo 1 > /proc/sys/vm/drop_caches");
@@ -143,6 +144,6 @@ int main(int argc, char **argv)
 
 	sleep(1);
 cleanup:
-	final_bpf__destroy(skel);
+	final_read_bpf__destroy(skel);
 	return -err;
 }
