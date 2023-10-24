@@ -67,7 +67,6 @@ int main(int argc, char **argv)
 		stringkey access_key_2 = "async_accessed";
 		u32 v;
 
-		//for(int file_size=32; file_size<=32; file_size*=4)
 		int file_size = 256;
 		{
 			v = 0;
@@ -157,4 +156,3 @@ cleanup:
 	count_mmap_bpf__destroy(skel);
 	return -err;
 }
-
