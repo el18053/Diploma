@@ -72,48 +72,6 @@ int trace_filemap_fault_exit(struct pt_regs *ctx)
 	return 0;
 }
 
-SEC("kprobe/page_cache_sync_ra")
-
-int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //page_cache_sync_ra started!
-                
-		//int req_count = 0;
-                //req_count = PT_REGS_PARM2(ctx);
-                //bpf_printk("page_cache_sync_ra started with req_count=%d", req_count);
-                
-		stringkey sync_ra_key = "sync_ra";
-                u32 flag = 1;
-                u32 *v = &flag;
-                bpf_map_update_elem(&execve_counter, &sync_ra_key, v, BPF_ANY);
-        }
-
-        return 0;
-}
-
-SEC("kretprobe/page_cache_sync_ra")
-
-int trace_page_cache_sync_ra_exit(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //page_cache_sync_ra exits!
-                
-		//bpf_printk("page_cache_sync_ra finished");
-                
-		stringkey sync_ra_key = "sync_ra";
-                u32 *v = NULL;
-                v = bpf_map_lookup_elem(&execve_counter, &sync_ra_key);
-                if (v != NULL) {
-                        *v = 0;
-                }
-        }
-
-        return 0;
-}
-
 SEC("kprobe/page_cache_async_ra")
 
 int trace_page_cache_async_ra_enter(struct pt_regs *ctx)
@@ -162,24 +120,8 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 {
         if ( get_access(bpf_get_current_pid_tgid()) )
         {
-                //bpf_printk("add_to_page_cache_lru started");
-
-                stringkey sync_ra_key = "sync_ra";
-                u32 *v = NULL;
-                v = bpf_map_lookup_elem(&execve_counter, &sync_ra_key);
-                if (v != NULL && *v == 1) {
-                        stringkey new_key = "sync_accessed";
-                        u32 *sync_accesses = NULL;
-                        sync_accesses = bpf_map_lookup_elem(&execve_counter, &new_key);
-                        if (sync_accesses != NULL) {
-                                *sync_accesses += 1;
-                        }
-
-                }
-
-
                 stringkey async_ra_key = "async_ra";
-                v = NULL;
+                u32 *v = NULL;
                 v = bpf_map_lookup_elem(&execve_counter, &async_ra_key);
                 if (v != NULL && *v == 1) {
                         stringkey new_key = "async_accessed";
@@ -189,6 +131,14 @@ int trace_page_cache_lru(struct pt_regs *ctx)
                                 *v += 1;
                         }
                 }
+		else {
+			stringkey new_key = "sync_accessed";
+                        u32 *sync_accesses = NULL;
+                        sync_accesses = bpf_map_lookup_elem(&execve_counter, &new_key);
+                        if (sync_accesses != NULL) {
+                                *sync_accesses += 1;
+                        }
+		}
 
         }
 
