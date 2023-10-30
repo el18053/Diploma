@@ -5055,7 +5055,7 @@ __u32		:32;		/* pad */
 	FN(get_func_ip),		\
 	FN(get_attach_cookie),		\
 	FN(task_pt_regs),		\
-	FN(simos),			\
+	FN(force_page2cache),		\
 	FN(get_filename),		
 	/* */
 

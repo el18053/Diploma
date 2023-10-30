@@ -277,9 +277,9 @@ const struct bpf_func_proto bpf_get_filename_proto = {
 	.arg3_type	= ARG_ANYTHING,
 };
 
-BPF_CALL_2(bpf_simos, struct file **, f, struct bpf_map *, map)
+BPF_CALL_2(bpf_force_page2cache, struct file **, f, struct bpf_map *, map)
 {
-	printk(KERN_DEBUG "bpf_simos started\n");
+	//printk(KERN_DEBUG "%s-%d : bpf_force_page2cache started\n", current->comm, current->pid);
 
 	unsigned long i = 0;
 
@@ -303,15 +303,15 @@ BPF_CALL_2(bpf_simos, struct file **, f, struct bpf_map *, map)
 	
 	DEFINE_READAHEAD(ractl, filp, ra, mapping, 0);
 	
-	my_custom_function_2(&ractl, *nr_pages, indexes);
+	offload_pages2cache(&ractl, *nr_pages, indexes);
 	
 	kfree(indexes);
-	
+	//printk(KERN_DEBUG "%s-%d : bpf_force_page2cache exits...\n", current->comm, current->pid);
 	return 0;
 }
 
-const struct bpf_func_proto bpf_simos_proto = {
-	.func		= bpf_simos,
+const struct bpf_func_proto bpf_force_page2cache_proto = {
+	.func		= bpf_force_page2cache,
 	.gpl_only	= false,
 	.ret_type	= RET_INTEGER,
 	.arg1_type	= ARG_ANYTHING,
@@ -1455,8 +1455,8 @@ bpf_base_func_proto(enum bpf_func_id func_id)
 			return &bpf_ringbuf_query_proto;
 		case BPF_FUNC_for_each_map_elem:
 			return &bpf_for_each_map_elem_proto;
-		case BPF_FUNC_simos:
-			return &bpf_simos_proto;
+		case BPF_FUNC_force_page2cache:
+			return &bpf_force_page2cache_proto;
 		case BPF_FUNC_get_filename:
 			return &bpf_get_filename_proto;
 		default:

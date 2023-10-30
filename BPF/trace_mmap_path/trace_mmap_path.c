@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 	{
 		sleep(1);
 
-		int file_size = 20;
+		int file_size = 1024*1024;
 		int bs = 4; //bs stands for block size
 		int fs = file_size; //fs stands for file size
 		int rs = fs; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 		}
 
 		stringkey bring_page_key = "bring_page";
-		int bring_page = 1;
+		int bring_page = 0;
 		err = bpf_map__update_elem(skel->maps.execve_counter, &bring_page_key, sizeof(bring_page_key), &bring_page, sizeof(bring_page),  BPF_ANY);
 		if (err != 0) {
 			fprintf(stderr, "Failed to save key %d\n", err);

@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 		printf("Child process started\n");
 
 		//for(int file_size = 32; file_size <= 2*1024*1024; file_size *= 4)
-		int file_size = 32;
+		int file_size = 2*1024*1024;
 		{
 			sleep(1);
 

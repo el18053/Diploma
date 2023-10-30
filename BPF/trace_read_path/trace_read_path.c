@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 		//child process
 		printf("Child process started\n");
 		
-		int file_size = 20;
+		int file_size = 256;
 		//for(int file_size = 32; file_size <= 2*1024*1024; file_size *= 2)
 		{
 		stringkey key = "key";
@@ -77,7 +77,7 @@ int main(int argc, char **argv)
 			goto cleanup;
 		}
 
-		int i = 0, nr_pages = file_size / 4;
+		int i = 0, nr_pages = 32;
 		
 		err = bpf_map__update_elem(skel->maps.index_map, &i, sizeof(i), &nr_pages, sizeof(nr_pages), BPF_ANY);
 		if (err != 0) {

@@ -57,11 +57,11 @@ int main(int argc, char **argv)
 		//child process
 		printf("Child process started\n");
 
-		for(int file_size = 32; file_size <= 32; file_size *= 4)
+		for(int file_size = 32; file_size <= 2*1024*1024; file_size *= 4)
 		{
 			sleep(1);
 
-			int bring_page = 0;
+			int bring_page = 1;
 			stringkey bring_page_key = "bring_page";
 			err = bpf_map__update_elem(skel->maps.pid_map, &bring_page_key, sizeof(bring_page_key), &bring_page, sizeof(bring_page), BPF_ANY);
 			if (err != 0) {
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 
 			int bs = 4; //bs stands for block size
 			int fs = file_size; //fs stands for file size
-			int rs = fs; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
+			int rs = fs/2; //rs stands for how many bytes of the file do we want to read (bs <= rs <= fs)
 
 			//Empty Cache
 			int result = system("echo 1 > /proc/sys/vm/drop_caches");

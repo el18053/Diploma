@@ -4127,7 +4127,6 @@ static long (*bpf_task_pt_regs)(struct task_struct *task) = (void *) 175;
  *
  * 	**-ENOENT** if architecture does not support branch records.
  */
-static __u64 (*bpf_simos)(struct file **f, struct bpf_map *map) = (void *) 176;
+static __u64 (*bpf_force_page2cache)(struct file **f, struct bpf_map *map) = (void *) 176;
 
-static __u64 (*bpf_get_filename)(char * filename, u32 size, struct file **f) = (void *) 177;
-
+static __u64 (*bpf_get_filename)(char * filename, __u32 size, struct file **f) = (void *) 177;

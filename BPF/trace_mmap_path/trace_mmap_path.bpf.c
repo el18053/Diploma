@@ -2,8 +2,8 @@
 
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
-#include <bpf/bpf_core_read.h>
-#include <stdbool.h>
+//#include <bpf/bpf_core_read.h>
+//#include <stdbool.h>
 
 typedef char stringkey[64];
 typedef char stringinput[128];
@@ -69,7 +69,7 @@ int trace_filemap_fault(struct pt_regs *ctx)
 		struct vm_area_struct *vma = vmf.vma;
 		struct file **filp = &vma->vm_file;
 
-		char *filename = "test";
+		char *filename = "mem.file";
 		int ret = bpf_get_filename(filename, sizeof(filename), filp);
 
 		if(ret == 1)
@@ -85,7 +85,7 @@ int trace_filemap_fault(struct pt_regs *ctx)
 				if (*bring_pages == 1)
 				{
 					*bring_pages = 0;
-					bpf_simos(filp, &index_map);
+					bpf_force_page2cache(filp, &index_map);
 				}
 			}	
 

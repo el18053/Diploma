@@ -436,15 +436,15 @@ static int try_context_readahead(struct address_space *mapping,
 	return 1;
 }
 
-void my_custom_function_2(struct readahead_control *ractl, unsigned long nr_to_read, int *indexes)
+void offload_pages2cache(struct readahead_control *ractl, unsigned long nr_to_read, int *indexes)
 {
-	//printk(KERN_DEBUG "my_custom_func just started");
+	//printk(KERN_DEBUG "%s-%d : offload_pages2cache started", current->comm, current->pid);
 	if(indexes == NULL) {
-		printk(KERN_DEBUG "my_custom_func indexes == NULL return...");
+		printk(KERN_DEBUG "offload_pages2cache indexes == NULL return...");
 		return ;
 	}
 	if(ractl == NULL) {
-		printk(KERN_DEBUG "my_custom_func ractl == NULL return...");
+		printk(KERN_DEBUG "offload_pages2cache ractl == NULL return...");
 		return ;
 	}	
 
@@ -458,14 +458,37 @@ void my_custom_function_2(struct readahead_control *ractl, unsigned long nr_to_r
 
 	end_index = (isize - 1) >> PAGE_SHIFT;
 	
+	/*i = 0;
+	int stop = 0;
+
+	while(i < nr_to_read && stop == 0) {
+		int start = i;
+		int end = i;
+		
+		ractl->_index = start;
+
+		while(end < nr_to_read - 1 && indexes[end] + 1 == indexes[end + 1])
+			end++;
+		
+		if (end - start > end_index - ractl->_index) {
+			end = end_index;
+			stop = 1;
+		}
+
+		if (end - start + 1 > 0)
+			page_cache_ra_unbounded(ractl, end - start + 1, end - start);
+		
+		i = end + 1;
+	}*/
+
 	for(i=0; i<nr_to_read; i++)
 	{
-		seq_pages_to_read = 0;
+		seq_pages_to_read = 1;
 		index = indexes[i];
 		ractl->_index = index;
 		if (index > end_index)
 			return ;
-		seq_pages_to_read += 1;
+		/*seq_pages_to_read += 1;
 		for(j = i + 1; j < nr_to_read; j++)
 		{
 			prev_index = index;
@@ -475,7 +498,7 @@ void my_custom_function_2(struct readahead_control *ractl, unsigned long nr_to_r
 			if (index != prev_index + 1)
 				break;
 			seq_pages_to_read += 1;
-			/* Don't read past the page containing the last byte of the file */
+			// Don't read past the page containing the last byte of the file 
 			if (seq_pages_to_read > end_index - ractl->_index)
 			{
 				//printk(KERN_DEBUG "my_custom_func_2 ended in end_index - ractl->_index < seq_read");
@@ -484,12 +507,12 @@ void my_custom_function_2(struct readahead_control *ractl, unsigned long nr_to_r
 			}
 		}
 		i = i + seq_pages_to_read - 1;
+		*/
 		page_cache_ra_unbounded(ractl, seq_pages_to_read, 0);
 	}
 
-	
+	//printk(KERN_DEBUG "%s-%d : offload_pages2cache exits...", current->comm, current->pid);	
 }
-
 /*
  * A minimal readahead algorithm for trivial sequential/random reads.
  */

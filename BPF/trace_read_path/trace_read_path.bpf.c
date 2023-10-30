@@ -227,7 +227,7 @@ int trace_filemap_get_pages(struct pt_regs *ctx) {
 				if(ret == 1)
 				{
 					*bring_page = 0;
-					bpf_simos(filp, &index_map);
+					bpf_force_page2cache(filp, &index_map);
 				}
 			}
 
@@ -237,7 +237,7 @@ int trace_filemap_get_pages(struct pt_regs *ctx) {
 	return 0;
 }
 
-SEC("kprobe/filemap_read_page")
+/*SEC("kprobe/filemap_read_page")
 
 int trace_filemap_read_page(struct pt_regs *ctx) {
 
@@ -248,6 +248,23 @@ int trace_filemap_read_page(struct pt_regs *ctx) {
 		stringinput message;
 		int key = get_key();
 		bpf_probe_read_str(message, sizeof(message), "filemap_read_page started");
+		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
+	}
+
+	return 0;
+}*/
+
+SEC("kprobe/my_custom_function_2")
+
+int trace_filemap_read_page(struct pt_regs *ctx) {
+
+	//if ( get_access(bpf_get_current_pid_tgid()) )
+	{
+		bpf_printk("my_custom_func started");
+
+		stringinput message;
+		int key = get_key();
+		bpf_probe_read_str(message, sizeof(message), "my_custom_func started");
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 
@@ -496,23 +513,6 @@ int trace_read_pages(struct pt_regs *ctx) {
 	return 0;
 }
 
-SEC("kprobe/__page_cache_alloc")
-
-int trace_page_cache_alloc(void *ctx) {
-
-	if ( get_access(bpf_get_current_pid_tgid()) )
-	{
-		bpf_printk("page_cache_alloc started");
-
-		stringinput message;
-		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "page_cache_alloc started");
-		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
-	}
-
-	return 0;
-}
-
 SEC("kprobe/add_to_page_cache_lru")
 
 int trace_page_cache_lru(struct pt_regs *ctx)
@@ -532,7 +532,7 @@ int trace_page_cache_lru(struct pt_regs *ctx)
 	return 0;
 }
 
-SEC("kretprobe/copy_page_to_iter")
+SEC("kprobe/copy_page_to_iter")
 
 int trace_copy_page_to_iter(struct pt_regs *ctx)
 {
@@ -542,13 +542,30 @@ int trace_copy_page_to_iter(struct pt_regs *ctx)
 		size_t offset = PT_REGS_PARM2(ctx); 
 		size_t bytes = PT_REGS_PARM3(ctx);
 
-		size_t return_bytes = PT_REGS_RC(ctx);
-
-		bpf_printk("copy_page_to_iter with offset=%d, bytes=%d returned : %d bytes", offset, bytes, return_bytes);
+		bpf_printk("copy_page_to_iter started with offset=%d, bytes=%d", offset, bytes);
 
 		stringinput message = "";
 		int key = get_key();
-		BPF_SNPRINTF(message, sizeof(message), "copy_page_to_iter with offset=%d, bytes=%d returned : %d bytes", offset, bytes, return_bytes);
+		BPF_SNPRINTF(message, sizeof(message), "copy_page_to_iter started with offset=%d, bytes=%d", offset, bytes);
+		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
+	}
+
+	return 0;
+}
+
+SEC("kretprobe/copy_page_to_iter")
+
+int trace_copy_page_to_iter_exit(struct pt_regs *ctx)
+{
+	if ( get_access(bpf_get_current_pid_tgid()) )
+	{
+		size_t return_bytes = PT_REGS_RC(ctx);
+
+		bpf_printk("copy_page_to_iter exited and returned : %d bytes", return_bytes);
+
+		stringinput message = "";
+		int key = get_key();
+		BPF_SNPRINTF(message, sizeof(message), "copy_page_to_iter exited and returned : %d bytes", return_bytes);
 		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
 	}
 

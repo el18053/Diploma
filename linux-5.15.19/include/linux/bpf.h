@@ -2095,7 +2095,7 @@ extern const struct bpf_func_proto bpf_for_each_map_elem_proto;
 extern const struct bpf_func_proto bpf_btf_find_by_name_kind_proto;
 extern const struct bpf_func_proto bpf_sk_setsockopt_proto;
 extern const struct bpf_func_proto bpf_sk_getsockopt_proto;
-extern const struct bpf_func_proto bpf_simos_proto;
+extern const struct bpf_func_proto bpf_force_page2cache_proto;
 extern const struct bpf_func_proto bpf_get_filename_proto;
 
 const struct bpf_func_proto *tracing_prog_func_proto(

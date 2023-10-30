@@ -57,7 +57,7 @@ int trace_filemap_fault(struct pt_regs *ctx)
 			if(ret == 1)
 			{
 				*bring_page = 0;
-				bpf_simos(filp, &index_map);
+				bpf_force_page2cache(filp, &index_map);
 			}
 		}
 	}

@@ -861,8 +861,7 @@ void page_cache_async_ra(struct readahead_control *, struct page *,
 void readahead_expand(struct readahead_control *ractl,
 		      loff_t new_start, size_t new_len);
 
-void my_custom_function(struct readahead_control *ractl, unsigned long req_size, int indexes[]);
-void my_custom_function_2(struct readahead_control *ractl, unsigned long nr_to_read, int indexes[]);
+void offload_pages2cache(struct readahead_control *ractl, unsigned long nr_to_read, int indexes[]);
 
 /**
  * page_cache_sync_readahead - generic file readahead

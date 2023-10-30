@@ -5827,7 +5827,7 @@ union bpf_attr {
 	FN(get_func_ip, 173, ##ctx)			\
 	FN(get_attach_cookie, 174, ##ctx)		\
 	FN(task_pt_regs, 175, ##ctx)			\
-	FN(simos, 176, ##ctx)				\
+	FN(force_page2cache, 176, ##ctx)		\
  	FN(get_filename, 177, ##ctx)			\
 	/* */
 
