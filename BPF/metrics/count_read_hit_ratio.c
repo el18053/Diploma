@@ -1,231 +1,203 @@
-#include <linux/bpf.h>
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
-#include <linux/ptrace.h>
-#include <linux/types.h>
-#include <stddef.h>
-#include <stdbool.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <sys/resource.h>
+#include <bpf/libbpf.h>
+#include "count_read_hit_ratio.skel.h"
 
-typedef __u32 u32;
+#define BUFFER_SIZE 4096
+
 typedef __u64 u64;
+typedef __u32 u32;
 typedef char stringkey[64];
 
 
-struct {
-        __uint(type, BPF_MAP_TYPE_HASH);
-        __uint(max_entries, 128);
-        //__type(key, stringkey);
-        stringkey* key;
-        __type(value, u32);
-} execve_counter SEC(".maps");
-
-int get_access(u32 process_pid)
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
-        stringkey pid_key = "pid";
-        u32 *saved_pid;
-        saved_pid = bpf_map_lookup_elem(&execve_counter, &pid_key);
-        if (saved_pid != NULL)
-        {
-                if (*saved_pid == process_pid)
-                        return 1;
-                return 0;
+        return vfprintf(stderr, format, args);
+}
+
+int main(int argc, char **argv)
+{
+        struct count_read_hit_ratio_bpf *skel;
+        int err;
+
+        libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+        /* Set up libbpf errors and debug info callback */
+        libbpf_set_print(libbpf_print_fn);
+
+        /* Open BPF application */
+        skel = count_read_hit_ratio_bpf__open();
+        if (!skel) {
+                fprintf(stderr, "Failed to open BPF skeleton\n");
+                return 1;
         }
 
-        return 0;
-}
-
-SEC("ksyscall/pread64")
-
-int trace_pread64(struct pt_regs *ctx) {
-        stringkey pid_key = "pid";
-        u32 uid;
-        uid = bpf_get_current_pid_tgid();
-
-        u32 *v;
-        v = bpf_map_lookup_elem(&execve_counter, &pid_key);
-        if (v == NULL) {
-                bpf_printk("ksys_pread64 started from process with pid:%d", uid);
-                v = &uid;
-                bpf_map_update_elem(&execve_counter, &pid_key, v, BPF_ANY);
+        /* Load & verify BPF programs */
+        err = count_read_hit_ratio_bpf__load(skel);
+        if (err) {
+                fprintf(stderr, "Failed to load and verify BPF skeleton\n");
+                goto cleanup;
         }
 
-        return 0;
-
-}
-
-SEC("kretsyscall/pread64")
-
-int trace_ret_pread64(struct pt_regs *ctx) {
-
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                bpf_printk("ksys_pread64 exited\n");
-                stringkey pid_key = "pid";
-                bpf_map_delete_elem(&execve_counter, &pid_key);
+        /* Attach tracepoint handler */
+        err = count_read_hit_ratio_bpf__attach(skel);
+        if (err) {
+                fprintf(stderr, "Failed to attach BPF skeleton\n");
+                goto cleanup;
         }
 
-        return 0;
-}
+        printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
+                        "to see output of the BPF programs.\n");
 
-SEC("kprobe/page_cache_sync_ra")
+        pid_t pid = fork();
 
-int trace_page_cache_sync_ra_enter(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //page_cache_sync_ra started!
-                int req_count = 0;
-                req_count = PT_REGS_PARM2(ctx);
-                bpf_printk("page_cache_sync_ra started with req_count=%d", req_count);
-
-		stringkey first_sync_ra_key = "first_sync_ra";
-                u32 flag = 1;
-                u32 *v = &flag;
-                bpf_map_update_elem(&execve_counter, &first_sync_ra_key, v, BPF_ANY);
-
-		stringkey prefetched_sync_ra_key = "prefetched_sync_ra";
-		bpf_map_update_elem(&execve_counter, &prefetched_sync_ra_key, v, BPF_ANY);
-
-	}
-
-        return 0;
-}
-
-SEC("kretprobe/page_cache_sync_ra")
-
-int trace_page_cache_sync_ra_exit(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //page_cache_sync_ra exits!
-                bpf_printk("page_cache_sync_ra finished");
-                stringkey first_sync_ra_key = "first_sync_ra";
-                u32 *v = NULL;
-                v = bpf_map_lookup_elem(&execve_counter, &first_sync_ra_key);
-                if (v != NULL) {
-                        *v = 0;
-                }
-
-		stringkey prefetched_sync_ra_key = "prefetched_sync_ra";
-		v = NULL;
-		v = bpf_map_lookup_elem(&execve_counter, &prefetched_sync_ra_key);
-		if (v != NULL) {
-			*v = 0;
-		}
+        if (pid == -1) {
+                perror("Failed to fork process");
+                goto cleanup;
         }
 
-        return 0;
-}
+        else if (pid == 0) {
+                sleep(1);
 
-SEC("kprobe/page_cache_async_ra")
+                //child process
+                printf("Child process started\n");
 
-int trace_page_cache_async_ra_enter(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //page_cache_async_ra started!
-                int req_count = 0;
-                req_count = PT_REGS_PARM3(ctx);
-                bpf_printk("page_cache_async_ra started with req_count=%d", req_count);
-                stringkey async_ra_key = "async_ra";
-                u32 flag = 1;
-                u32 *v = &flag;
-                bpf_map_update_elem(&execve_counter, &async_ra_key, v, BPF_ANY);
-        }
+                //Init Counters to Zero
+                stringkey access_key = "mark_page_accessed";
+                stringkey copy_page_key = "copy_page_to_iter";
+                stringkey access_key_1 = "sync_accessed";
+                stringkey access_key_2 = "async_accessed";
+                u32 v;
 
-        return 0;
-}
+                for (int bs=4; bs<=4; bs*=2) { //bs stands for block size
+                        for(int fs=32; fs<=32; fs*=4) // fs stands for file size
+                        {
+                                v = 0;
+                                err = bpf_map__update_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &v, sizeof(v),  BPF_ANY);
+                                if (err != 0) {
+                                        fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                                        goto cleanup;
+                                }
 
-SEC("kretprobe/page_cache_async_ra")
+                                v = 0;
+                                err = bpf_map__update_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &v, sizeof(v),  BPF_ANY);
+                                if (err != 0) {
+                                        fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                                        goto cleanup;
+                                }
 
-int trace_page_cache_async_ra_exit(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //page_cache_async_ra exits!
-                bpf_printk("page_cache_async_ra finished");
-                stringkey async_ra_key = "async_ra";
-                u32 *v = NULL;
-                v = bpf_map_lookup_elem(&execve_counter, &async_ra_key);
-                if (v != NULL) {
-                        *v = 0;
-                }
-        }
+                                v = 0;
+                                err = bpf_map__update_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &v, sizeof(v),  BPF_ANY);
+                                if (err != 0) {
+                                        fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                                        goto cleanup;
+                                }
 
-        return 0;
-}
+                                v = 0;
+                                err = bpf_map__update_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &v, sizeof(v),  BPF_ANY);
+                                if (err != 0) {
+                                        fprintf(stderr, "Failed to init the process pid, %d\n", err);
+                                        goto cleanup;
+                                }
 
-SEC("kprobe/add_to_page_cache_lru")
+                                int rs = fs;
+                                char *engine = "psync";
 
-int trace_page_cache_lru(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-                //bpf_printk("add_to_page_cache_lru started");
+                                char fioCommand[100];
+                                sprintf(fioCommand, "BLOCK_SIZE=%dk FILESIZE=%dk ENGINE=%s READSIZE=%dk fio readfile.fio", bs, fs, engine, rs);
 
-		stringkey first_sync_ra_key = "first_sync_ra";
-                u32 *v = NULL;
-                v = bpf_map_lookup_elem(&execve_counter, &first_sync_ra_key);
+                                // Execute the FIO command
+                                int result = system(fioCommand);
 
-		stringkey prefetched_sync_ra_key = "prefetched_sync_ra";
-		u32 *v2 = NULL;
-		v2 = bpf_map_lookup_elem(&execve_counter, &prefetched_sync_ra_key);
-		if (v != NULL && *v == 0 && v2 != NULL && *v2 == 1) {
-			stringkey new_key = "async_accessed";
-			u32 *async_accesses = NULL;
-			async_accesses = bpf_map_lookup_elem(&execve_counter, &new_key);
-			if (async_accesses != NULL) {
-				*async_accesses += 1;
-			}
-		}
+                                if (result == -1) {
+                                        printf("Failed to execute FIO command.\n");
+                                        goto cleanup;
+                                }
 
-		if (v != NULL && *v == 1) {
-                        stringkey new_key = "sync_accessed";
-                        u32 *sync_accesses = NULL;
-                        sync_accesses = bpf_map_lookup_elem(&execve_counter, &new_key);
-                        if (sync_accesses != NULL) {
-                                *sync_accesses += 1;
-				*v = 0;
+                                u32 accesses, copy_page, sync_accesses, async_accesses;
+
+                                err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key, sizeof(access_key), &accesses, sizeof(accesses), BPF_ANY);
+                                if (err != 0) {
+                                        fprintf(stderr, "Lookup key from map error: %d\n", err);
+                                        goto cleanup;
+                                }
+
+                                err = bpf_map__lookup_elem(skel->maps.execve_counter, &copy_page_key, sizeof(copy_page_key), &copy_page, sizeof(copy_page), BPF_ANY);
+                                if (err != 0) {
+                                        fprintf(stderr, "Lookup key from map error: %d\n", err);
+                                        goto cleanup;
+                                }
+
+                                err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_1, sizeof(access_key_1), &sync_accesses, sizeof(sync_accesses), BPF_ANY);
+                                if (err != 0) {
+                                        fprintf(stderr, "Lookup key from map error: %d\n", err);
+                                        goto cleanup;
+                                }
+
+                                err = bpf_map__lookup_elem(skel->maps.execve_counter, &access_key_2, sizeof(access_key_2), &async_accesses, sizeof(async_accesses), BPF_ANY);
+                                if (err != 0) {
+                                        fprintf(stderr, "Lookup key from map error: %d\n", err);
+                                        goto cleanup;
+                                }
+
+                                const char* filename = "result.txt";
+
+                                // Open the file in append mode
+                                FILE* file = fopen(filename, "a");
+                                if (file == NULL) {
+                                        printf("Failed to open the file.\n");
+                                        goto cleanup;
+                                }
+
+                                fprintf(file, "FILE SIZE = %d KB\n", fs);
+                                fprintf(file, "BLOCK SIZE = %d KB\n", bs);
+                                fprintf(file, "Number page accesses : %d\n", accesses);
+                                fprintf(file, "Number page copied to user : %d\n", copy_page);
+                                fprintf(file, "Number page cache misses : %d\n", sync_accesses);
+                                fprintf(file, "Number of prefetched pages : %d\n", async_accesses);
+                                double ratio = 0;
+                                ratio = ((double)copy_page - sync_accesses) / copy_page;
+                                fprintf(file, "Cache Hit Ratio(%%) : %f\n", ratio*100);
+                                ratio = 1 - ratio;
+                                fprintf(file, "Cache Miss Ratio(%%) : %f\n", ratio*100);
+                                ratio = (async_accesses + sync_accesses) > 0 ? (double)async_accesses / (double)(async_accesses + sync_accesses) : 0;
+                                fprintf(file, "Cache Prefetching Ratio(%%) : %f\n", ratio*100);
+                                /*if (copy_page != sync_accesses + async_accesses) {
+                                        if (bs < 4) {
+                                                if (copy_page != 4 / bs * (sync_accesses + async_accesses))
+                                                        fprintf(file, "WARNING : COPY_PAGE != SYNC_ACCESSES + ASYNC_ACCESES\n");
+                                        }
+                                        else
+                                                fprintf(file, "WARNING : COPY_PAGE != SYNC_ACCESSES + ASYNC_ACCESES\n");
+                                }*/
+                                fprintf(file, "###############################################################\n");
+
+                                // Close the file
+                                fclose(file);
+
                         }
-
                 }
+        }
+        else {
+                //parent process
+                printf("Parent process created Child process with PID: %d\n", pid);
 
-                stringkey async_ra_key = "async_ra";
-                v = NULL;
-                v = bpf_map_lookup_elem(&execve_counter, &async_ra_key);
-                if (v != NULL && *v == 1) {
-                        stringkey new_key = "async_accessed";
-                        u32 *async_accesses = NULL;
-			async_accesses = bpf_map_lookup_elem(&execve_counter, &new_key);
-			if (async_accesses != NULL) {
-				*async_accesses += 1;
-			}
+                //wait for child process to execute read commmand
+                int status;
+                wait(&status);
+                if (WIFEXITED(status)) {
+                        printf("Child process exited with status: %d\n", WEXITSTATUS(status));
                 }
 
         }
 
-        return 0;
+        sleep(1);
+
+cleanup:
+        count_read_hit_ratio_bpf__destroy(skel);
+        return -err;
 }
-
-SEC("kretprobe/copy_page_to_iter")
-
-int trace_copy_page_to_iter(struct pt_regs *ctx)
-{
-        if ( get_access(bpf_get_current_pid_tgid()) )
-        {
-
-		//bpf_printk("copy_page_to_iter started with offset=%d, bytes=%d", offset, bytes);
-
-                stringkey new_key = "copy_page_to_iter";
-                u32 *v = NULL;
-                v = bpf_map_lookup_elem(&execve_counter, &new_key);
-                if (v != NULL) {
-                        if ( PT_REGS_RC(ctx) )
-				*v += 1;
-                }
-        }
-
-        return 0;
-}
-
-char LICENSE[] SEC("license") = "Dual BSD/GPL";
