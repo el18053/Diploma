@@ -457,38 +457,15 @@ void offload_pages2cache(struct readahead_control *ractl, unsigned long nr_to_re
 		return;
 
 	end_index = (isize - 1) >> PAGE_SHIFT;
-	
-	/*i = 0;
-	int stop = 0;
-
-	while(i < nr_to_read && stop == 0) {
-		int start = i;
-		int end = i;
-		
-		ractl->_index = start;
-
-		while(end < nr_to_read - 1 && indexes[end] + 1 == indexes[end + 1])
-			end++;
-		
-		if (end - start > end_index - ractl->_index) {
-			end = end_index;
-			stop = 1;
-		}
-
-		if (end - start + 1 > 0)
-			page_cache_ra_unbounded(ractl, end - start + 1, end - start);
-		
-		i = end + 1;
-	}*/
 
 	for(i=0; i<nr_to_read; i++)
 	{
-		seq_pages_to_read = 1;
+		seq_pages_to_read = 0;
 		index = indexes[i];
 		ractl->_index = index;
 		if (index > end_index)
 			return ;
-		/*seq_pages_to_read += 1;
+		seq_pages_to_read += 1;
 		for(j = i + 1; j < nr_to_read; j++)
 		{
 			prev_index = index;
@@ -507,7 +484,7 @@ void offload_pages2cache(struct readahead_control *ractl, unsigned long nr_to_re
 			}
 		}
 		i = i + seq_pages_to_read - 1;
-		*/
+		
 		page_cache_ra_unbounded(ractl, seq_pages_to_read, 0);
 	}
 
