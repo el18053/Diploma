@@ -254,23 +254,6 @@ int trace_filemap_read_page(struct pt_regs *ctx) {
 	return 0;
 }*/
 
-SEC("kprobe/my_custom_function_2")
-
-int trace_filemap_read_page(struct pt_regs *ctx) {
-
-	//if ( get_access(bpf_get_current_pid_tgid()) )
-	{
-		bpf_printk("my_custom_func started");
-
-		stringinput message;
-		int key = get_key();
-		bpf_probe_read_str(message, sizeof(message), "my_custom_func started");
-		bpf_map_update_elem(&log_file, &key, message, BPF_ANY);
-	}
-
-	return 0;
-}
-
 SEC("kprobe/filemap_get_read_batch")
 
 int trace_filemap_get_read_batch(struct pt_regs *ctx) {
