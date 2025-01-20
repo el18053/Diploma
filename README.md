@@ -1,4 +1,3 @@
-# Diploma
 # Optimizing Linux Kernel Storage Stack with eBPF
 
 ## Description
